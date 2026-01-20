@@ -1,0 +1,57 @@
+Ok this is my second file.
+Just tested out the ctrl + n shortcut to create a new file.
+I am going to try a few shortcuts.
+Ctrl + z and ctrl + y seem to work pretty good.
+I am going to try getting out of the file when it is not saved to see if it warns me.
+Ya that worked.  Again I am very impressed with this.  I gave amp a total of two prompts to get here.
+What about opening a new file.  Does it ask to save unsaved changes when I do that?
+Nice it does.
+Ok what about selections.
+Nice I can select with the mouse.
+What about copy and paste. copy and paste copy and paste copy and paste copy and paste copy and paste copy and paste copy and paste copy and paste copy and paste copy and paste copy and paste copy and paste copy and paste copy and paste
+Nice what about .
+cut and pastecut and pastecut and pastecut and pastecut and paste
+Nice!
+What about find and replace.
+Hmm.  Something is up.
+Ok find is not case sensitive, but Replace All is case sensitive.  Other than that we are chillin.
+Also I like the little star at the top that tells me if the document is saved or not.
+There is a small thing with that tho.  It's not that bad, but if I add something then remove it, it still shows that the file needs saved even though the file is the same as the last saved version.  However, when I try to close the file it doesn't warn me that there are saved changes.  It shows the unsaved star at the top but doesn't warn me that there are unsaved changes because there aren't actually any unsaved changes.  This is totally fine with me because it doesn't cause anything bad to happen.
+What about crtl + A.
+Nice that works!
+I wonder what happens if I get to the end of the vertical view.
+I don't see any scroll bars right now so IDK if it will let me scroll.
+Ok just noticed a small problem.  When clicking on edit or view in the menu bar, the shorcut description and the shortcut are sometimes overlapping.  If the description is too long then they overlap.
+Nice the Help menu shows all the features.
+Oh nice there is a status bar at the bottom showing my current cursor position.
+I can also toggle the side bar with ctrl + b and that works.  Just checked.
+Ok I am amlost to the end of my current vertical view.
+I wonder if it will add a scroll bar.
+I guess we will see.
+Nice it did.
+Doesn't look that great tho, but still impressive.
+
+
+
+
+
+
+
+
+
+
+
+
+
+Ya it works pretty good.
+Ok now I need to test zooming in and out.
+Ok when I zoom out to much then the line numbers get cut off.
+Also zooming in a lot makes the numbers sus also.
+The size of the numbers don't change. So ya.
+It is also impossible to tell if I am back at the normal 100% zoom or not.
+I think that is every thing.  I am just going to try zooming out a ton then closing and reopening the program.
+Oh ya real quick forgot to mention that when zooming in you literlly have to do ctrl + +.  Meaning ctrl + shift + =.  Because shift is required to type '+'.
+
+Anyways I am going to try that now.
+Ok ya it zooms back to the normal size.
+But you open the text editor it is for some reason off my screen a little bit.  At first I thought it didn't save the last two lines of my file, but I realized that they were just off the screen.

@@ -1,3 +1,9 @@
-Wassup how we doing.
+Wassup.
 Dude nice.  This actually looks really nice.  I wonder what happens if you get to the end of the line.  IDK I guess we will see.  Ok it adds a new line, but doesn't add a new line number.  A new line number is only added when the newline character is pressed.
 Like that.
+
+
+
+
+
+ 
