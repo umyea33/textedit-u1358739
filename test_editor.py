@@ -327,6 +327,44 @@ class TestTextEditor:
         
         assert window.editor.font().pointSize() == initial_size - 1
 
+    def test_zoom_in_also_zooms_line_numbers(self, qtbot):
+        """Line numbers should zoom in along with the text."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        initial_editor_size = window.editor.font().pointSize()
+        initial_line_num_size = window.editor.line_number_area.font().pointSize()
+        
+        window.zoom_in()
+        
+        new_editor_size = window.editor.font().pointSize()
+        new_line_num_size = window.editor.line_number_area.font().pointSize()
+        
+        assert new_editor_size == initial_editor_size + 1
+        assert new_line_num_size == initial_line_num_size + 1, \
+            f"Line number font should zoom in from {initial_line_num_size} to {initial_line_num_size + 1}, but got {new_line_num_size}"
+
+    def test_zoom_out_also_zooms_line_numbers(self, qtbot):
+        """Line numbers should zoom out along with the text."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        initial_editor_size = window.editor.font().pointSize()
+        initial_line_num_size = window.editor.line_number_area.font().pointSize()
+        
+        window.zoom_out()
+        
+        new_editor_size = window.editor.font().pointSize()
+        new_line_num_size = window.editor.line_number_area.font().pointSize()
+        
+        assert new_editor_size == initial_editor_size - 1
+        assert new_line_num_size == initial_line_num_size - 1, \
+            f"Line number font should zoom out from {initial_line_num_size} to {initial_line_num_size - 1}, but got {new_line_num_size}"
+
     def test_zoom_out_minimum_limit(self, qtbot):
         window = TextEditor()
         qtbot.addWidget(window)

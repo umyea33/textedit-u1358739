@@ -577,12 +577,14 @@ class TextEditor(QMainWindow):
         font = self.editor.font()
         font.setPointSize(font.pointSize() + 1)
         self.editor.setFont(font)
+        self.editor.line_number_area.setFont(font)
     
     def zoom_out(self):
         font = self.editor.font()
         if font.pointSize() > 6:
             font.setPointSize(font.pointSize() - 1)
             self.editor.setFont(font)
+            self.editor.line_number_area.setFont(font)
     
     def show_about(self):
         QMessageBox.about(
