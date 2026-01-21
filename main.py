@@ -379,6 +379,9 @@ class TextEditor(QMainWindow):
                 color: #cccccc;
                 border: 1px solid #454545;
             }
+            QMenu::item {
+                padding: 5px 30px 5px 20px;
+            }
             QMenu::item:selected {
                 background-color: #094771;
             }

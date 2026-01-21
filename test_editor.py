@@ -1058,6 +1058,36 @@ class TestFindReplaceDialog:
         assert editor.toPlainText() == "hello world", "Undo should revert the ' foo' addition"
 
 
+class TestMenuLayout:
+    """Tests for menu appearance and layout."""
+
+    def test_menu_items_have_adequate_shortcut_padding(self, qtbot):
+        """
+        Test that menu styling includes adequate padding between text and shortcuts.
+        The QMenu::item stylesheet should have proper padding to prevent text/shortcut overlap.
+        """
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        style = window.styleSheet()
+        
+        # Check that QMenu::item has padding defined (not just QMenu)
+        # This is required to provide spacing between menu item text and keyboard shortcuts
+        assert "QMenu::item" in style, \
+            "QMenu::item should be styled in the stylesheet"
+        
+        # Extract QMenu::item section and verify it has padding
+        import re
+        menu_item_match = re.search(r'QMenu::item\s*\{[^}]*\}', style)
+        assert menu_item_match, "QMenu::item styling block not found"
+        
+        menu_item_style = menu_item_match.group(0)
+        assert "padding" in menu_item_style, \
+            "QMenu::item should have padding defined to prevent text/shortcut overlap"
+
+
 class TestWindowGeometry:
     """Tests for window size and positioning."""
 
