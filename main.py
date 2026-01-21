@@ -192,7 +192,14 @@ class TextEditor(QMainWindow):
     
     def init_ui(self):
         self.setWindowTitle("TextEdit - Untitled")
-        self.setGeometry(100, 100, 1200, 800)
+        
+        # Set window size to fit within available screen space
+        screen = QApplication.primaryScreen().availableGeometry()
+        width = min(1200, screen.width() - 100)
+        height = min(800, screen.height() - 100)
+        x = (screen.width() - width) // 2
+        y = (screen.height() - height) // 2
+        self.setGeometry(x, y, width, height)
         
         # Central widget
         central_widget = QWidget()

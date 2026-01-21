@@ -1058,6 +1058,38 @@ class TestFindReplaceDialog:
         assert editor.toPlainText() == "hello world", "Undo should revert the ' foo' addition"
 
 
+class TestWindowGeometry:
+    """Tests for window size and positioning."""
+
+    def test_initial_window_fits_on_screen(self, qtbot):
+        """
+        Test that the initial window size fits within the available screen space.
+        The window should not extend beyond the screen boundaries.
+        """
+        from PySide6.QtWidgets import QApplication
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Get available screen geometry (excludes taskbar, etc.)
+        screen = QApplication.primaryScreen().availableGeometry()
+        
+        # Get window geometry
+        window_geometry = window.frameGeometry()
+        
+        # Window should fit within screen bounds
+        assert window_geometry.right() <= screen.right(), \
+            f"Window extends beyond right edge: window ends at {window_geometry.right()}, screen ends at {screen.right()}"
+        assert window_geometry.bottom() <= screen.bottom(), \
+            f"Window extends beyond bottom edge: window ends at {window_geometry.bottom()}, screen ends at {screen.bottom()}"
+        assert window_geometry.left() >= screen.left(), \
+            f"Window extends beyond left edge: window starts at {window_geometry.left()}, screen starts at {screen.left()}"
+        assert window_geometry.top() >= screen.top(), \
+            f"Window extends beyond top edge: window starts at {window_geometry.top()}, screen starts at {screen.top()}"
+
+
 class TestKeyboardShortcuts:
     """Tests for keyboard shortcuts."""
 
