@@ -941,6 +941,82 @@ class TestFindReplaceDialog:
         assert "Cat" in text
         assert text == "THE quick brown FOX jumps over THE lazy Cat"
 
+    def test_find_replace_marks_document_as_modified(self, qtbot, tmp_path, monkeypatch):
+        """
+        Test that using find and replace on an opened file marks the document as modified,
+        so that closing the file triggers the unsaved changes warning.
+        """
+        # Create a test file
+        test_file = tmp_path / "test_doc.txt"
+        test_file.write_text("hello world hello", encoding='utf-8')
+        
+        # Open the file in the editor
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.load_file(str(test_file))
+        
+        # Verify file loaded and not modified
+        assert window.editor.toPlainText() == "hello world hello"
+        assert not window.editor.document().isModified()
+        
+        # Use find and replace
+        dialog = FindReplaceDialog(window.editor, window)
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("goodbye")
+        
+        dialog.find_next()
+        dialog.replace()
+        
+        # Verify document is now modified
+        assert window.editor.document().isModified()
+        
+        # Track if the save warning dialog was triggered
+        warning_shown = []
+        monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: warning_shown.append(True) or QMessageBox.Discard)
+        
+        # Try to close - should trigger unsaved changes warning
+        window.close()
+        
+        # Verify the warning was shown
+        assert len(warning_shown) == 1, "Unsaved changes warning should be shown when closing after find/replace"
+
+    def test_replace_all_marks_document_as_modified(self, qtbot, tmp_path, monkeypatch):
+        """
+        Test that using Replace All on an opened file marks the document as modified,
+        so that closing the file triggers the unsaved changes warning.
+        """
+        # Create a test file
+        test_file = tmp_path / "test_doc.txt"
+        test_file.write_text("hello world hello", encoding='utf-8')
+        
+        # Open the file in the editor
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.load_file(str(test_file))
+        
+        # Verify file loaded and not modified
+        assert window.editor.toPlainText() == "hello world hello"
+        assert not window.editor.document().isModified()
+        
+        # Use Replace All
+        dialog = FindReplaceDialog(window.editor, window)
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("goodbye")
+        dialog.replace_all()
+        
+        # Verify document is now modified
+        assert window.editor.document().isModified(), "Document should be marked as modified after Replace All"
+        
+        # Track if the save warning dialog was triggered
+        warning_shown = []
+        monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: warning_shown.append(True) or QMessageBox.Discard)
+        
+        # Try to close - should trigger unsaved changes warning
+        window.close()
+        
+        # Verify the warning was shown
+        assert len(warning_shown) == 1, "Unsaved changes warning should be shown when closing after Replace All"
+
 
 class TestKeyboardShortcuts:
     """Tests for keyboard shortcuts."""
