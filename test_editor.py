@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt, QPoint, QTimer
 from PySide6.QtGui import QTextCursor, QFont
 from PySide6.QtWidgets import QApplication, QMessageBox, QFileDialog
 
-from main import TextEditor, CodeEditor, FindReplaceDialog, LineNumberArea
+from main import TextEditor, CodeEditor, FindReplaceDialog, LineNumberArea, CustomTabWidget, CustomTabBar
 
 
 class TestCodeEditor:
@@ -2048,3 +2048,123 @@ class TestEdgesCases:
          window.load_file(str(file_path))
          assert window.editor.toPlainText() == newlines
          assert window.editor.blockCount() == 6
+
+
+class TestTabs:
+    """Tests for the tab functionality."""
+
+    def test_custom_tab_bar_creation(self, qtbot):
+         """Test CustomTabBar creation."""
+         tab_bar = CustomTabBar()
+         qtbot.addWidget(tab_bar)
+         assert tab_bar is not None
+         assert tab_bar.tabsClosable()
+
+    def test_custom_tab_widget_creation(self, qtbot):
+         """Test CustomTabWidget creation."""
+         tab_widget = CustomTabWidget()
+         qtbot.addWidget(tab_widget)
+         assert tab_widget is not None
+         assert tab_widget.tab_bar is not None
+
+    def test_text_editor_with_initial_tab(self, qtbot):
+         """Test TextEditor initializes with one untitled tab."""
+         window = TextEditor()
+         qtbot.addWidget(window)
+         assert window.tab_widget is not None
+         assert window.tab_widget.count() == 1
+         assert window.tab_widget.tabText(0) == "Untitled"
+
+    def test_create_new_tab(self, qtbot):
+         """Test creating a new tab."""
+         window = TextEditor()
+         qtbot.addWidget(window)
+         initial_count = window.tab_widget.count()
+         window.create_new_tab()
+         assert window.tab_widget.count() == initial_count + 1
+
+    def test_tab_switching(self, qtbot):
+         """Test switching between tabs."""
+         window = TextEditor()
+         qtbot.addWidget(window)
+         window.create_new_tab()
+         
+         window.tab_widget.setCurrentIndex(0)
+         assert window.tab_widget.currentIndex() == 0
+         
+         window.tab_widget.setCurrentIndex(1)
+         assert window.tab_widget.currentIndex() == 1
+
+    def test_tab_shows_unsaved_changes(self, qtbot):
+         """Test that tab shows asterisk for unsaved changes."""
+         window = TextEditor()
+         qtbot.addWidget(window)
+         editor = window.tab_widget.widget(0)
+         
+         editor.setPlainText("test content")
+         qtbot.wait(100)
+         
+         tab_text = window.tab_widget.tabText(0)
+         assert "*" in tab_text
+
+    def test_tab_title_updates_on_file_load(self, qtbot, tmp_path):
+         """Test that tab title shows filename when file is loaded."""
+         window = TextEditor()
+         qtbot.addWidget(window)
+         
+         test_file = tmp_path / "test.txt"
+         test_file.write_text("content")
+         
+         window.load_file(str(test_file))
+         tab_text = window.tab_widget.tabText(0)
+         assert "test.txt" in tab_text
+
+    def test_load_same_file_switches_to_existing_tab(self, qtbot, tmp_path):
+         """Test that loading an already open file switches to its tab."""
+         window = TextEditor()
+         qtbot.addWidget(window)
+         
+         test_file = tmp_path / "test.txt"
+         test_file.write_text("content")
+         
+         window.load_file(str(test_file))
+         first_tab_index = window.tab_widget.currentIndex()
+         
+         window.create_new_tab()
+         assert window.tab_widget.currentIndex() != first_tab_index
+         
+         window.load_file(str(test_file))
+         assert window.tab_widget.currentIndex() == first_tab_index
+
+    def test_close_tab_with_unsaved_changes(self, qtbot, monkeypatch):
+         """Test closing a tab with unsaved changes prompts user."""
+         window = TextEditor()
+         qtbot.addWidget(window)
+         editor = window.tab_widget.widget(0)
+         editor.setPlainText("unsaved content")
+         
+         # Mock the dialog to return Discard
+         monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: QMessageBox.Discard
+         )
+         
+         window.close_tab(0)
+         assert window.tab_widget.count() == 1  # New untitled tab created
+
+    def test_open_files_tracking(self, qtbot, tmp_path):
+         """Test that open files are properly tracked."""
+         window = TextEditor()
+         qtbot.addWidget(window)
+         
+         test_file1 = tmp_path / "file1.txt"
+         test_file2 = tmp_path / "file2.txt"
+         test_file1.write_text("content1")
+         test_file2.write_text("content2")
+         
+         window.load_file(str(test_file1))
+         assert str(test_file1) in window.open_files
+         
+         window.load_file(str(test_file2))
+         assert str(test_file2) in window.open_files
+         assert len(window.open_files) == 2

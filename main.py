@@ -4,13 +4,65 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QPlainTextEdit, QWidget, QVBoxLayout,
     QHBoxLayout, QFileDialog, QMessageBox, QStatusBar, QMenuBar,
     QToolBar, QLabel, QLineEdit, QDialog, QPushButton, QSplitter,
-    QTreeView, QFileSystemModel, QFrame, QTextEdit, QInputDialog, QMenu
+    QTreeView, QFileSystemModel, QFrame, QTextEdit, QInputDialog, QMenu,
+    QTabWidget, QTabBar
 )
 from PySide6.QtGui import (
     QAction, QKeySequence, QFont, QColor, QPainter, QTextFormat,
     QTextCursor, QFontMetrics, QPalette, QShortcut, QTextCharFormat
 )
-from PySide6.QtCore import Qt, QRect, QSize, QDir, Signal, QTimer
+from PySide6.QtCore import Qt, QRect, QSize, QDir, Signal, QTimer, QPoint
+
+
+class CustomTabBar(QTabBar):
+    """Custom tab bar with close buttons."""
+    
+    close_requested = Signal(int)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMovable(False)
+        self.setTabsClosable(True)
+        self.tabCloseRequested.connect(self.on_close_requested)
+    
+    def on_close_requested(self, index):
+        self.close_requested.emit(index)
+
+
+class CustomTabWidget(QTabWidget):
+    """Custom tab widget that manages file tabs."""
+    
+    close_requested = Signal(int)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.tab_bar = CustomTabBar(self)
+        self.setTabBar(self.tab_bar)
+        self.tab_bar.close_requested.connect(self.on_tab_close_requested)
+        self.setStyleSheet("""
+            QTabBar::tab {
+                background-color: #2d2d30;
+                color: #cccccc;
+                padding: 6px 12px;
+                border: 1px solid #3e3e42;
+                border-bottom: none;
+                margin-right: 2px;
+            }
+            QTabBar::tab:selected {
+                background-color: #1e1e1e;
+                border-bottom: 2px solid #0ea5e9;
+            }
+            QTabBar::tab:hover {
+                background-color: #323232;
+            }
+            QTabWidget::pane {
+                border: none;
+                background-color: #1e1e1e;
+            }
+        """)
+    
+    def on_tab_close_requested(self, index):
+        self.close_requested.emit(index)
 
 
 class LineNumberArea(QWidget):
@@ -188,6 +240,8 @@ class TextEditor(QMainWindow):
     def __init__(self):
          super().__init__()
          self.current_file = None
+         self.open_files = {}  # Maps file path to tab index
+         self.file_modified_state = {}  # Tracks if each file is modified
          self.zoom_indicator_timer = QTimer()
          self.zoom_indicator_timer.timeout.connect(self.hide_zoom_indicator)
          self.init_ui()
@@ -251,12 +305,16 @@ class TextEditor(QMainWindow):
         
         self.update_folder_label(QDir.currentPath())
         
-        # Editor
-        self.editor = CodeEditor()
-        self.editor.textChanged.connect(self.on_text_changed)
+        # Editor with tabs
+        self.tab_widget = CustomTabWidget()
+        self.tab_widget.close_requested.connect(self.close_tab)
+        self.tab_widget.currentChanged.connect(self.on_tab_changed)
+        
+        # Create initial untitled editor
+        self.create_new_tab()
         
         splitter.addWidget(sidebar_widget)
-        splitter.addWidget(self.editor)
+        splitter.addWidget(self.tab_widget)
         splitter.setSizes([200, 1000])
         
         main_layout.addWidget(splitter)
@@ -264,9 +322,6 @@ class TextEditor(QMainWindow):
         # Create menus and toolbars
         self.create_menu_bar()
         self.create_status_bar()
-        
-        # Connect cursor position to status bar
-        self.editor.cursorPositionChanged.connect(self.update_cursor_position)
     
     def create_menu_bar(self):
         menubar = self.menuBar()
@@ -520,11 +575,105 @@ class TextEditor(QMainWindow):
         """
         self.setStyleSheet(dark_style)
     
+    def create_new_tab(self, file_path=None):
+        """Create a new editor tab."""
+        editor = CodeEditor()
+        editor.textChanged.connect(self.on_text_changed)
+        editor.cursorPositionChanged.connect(self.update_cursor_position)
+        
+        if file_path:
+            tab_name = os.path.basename(file_path)
+        else:
+            tab_name = "Untitled"
+            file_path = None
+        
+        index = self.tab_widget.addTab(editor, tab_name)
+        if file_path:
+            self.open_files[file_path] = index
+            self.file_modified_state[file_path] = False
+        
+        self.tab_widget.setCurrentIndex(index)
+        self.current_file = file_path
+        self.editor = editor
+        return editor, file_path
+    
+    def on_tab_changed(self, index):
+         """Handle tab change."""
+         if index >= 0:
+             self.editor = self.tab_widget.widget(index)
+             # Find the file path for this tab
+             new_current_file = None
+             for file_path, tab_index in self.open_files.items():
+                 if tab_index == index:
+                     new_current_file = file_path
+                     break
+             
+             # Only update if the file still exists in our tracking
+             # This prevents restoring current_file after deletion
+             self.current_file = new_current_file
+             
+             # Update window title
+             if self.current_file:
+                 title = f"TextEdit - {self.current_file}"
+                 if self.editor.document().isModified():
+                     title += " *"
+                 self.setWindowTitle(title)
+             else:
+                 tab_title = self.tab_widget.tabText(index)
+                 if tab_title.endswith("*"):
+                     self.setWindowTitle(f"TextEdit - {tab_title[:-2]} *")
+                 else:
+                     self.setWindowTitle(f"TextEdit - {tab_title}")
+             
+             self.update_cursor_position()
+    
+    def close_tab(self, index):
+        """Close a tab, with unsaved changes warning."""
+        editor = self.tab_widget.widget(index)
+        if editor.document().isModified():
+            ret = QMessageBox.warning(
+                self, "TextEdit",
+                "The document has been modified.\nDo you want to save your changes?",
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
+            )
+            if ret == QMessageBox.Save:
+                if self.save_current_file():
+                    self.remove_tab(index)
+            elif ret == QMessageBox.Discard:
+                self.remove_tab(index)
+        else:
+            self.remove_tab(index)
+    
+    def remove_tab(self, index):
+        """Remove a tab without prompting."""
+        # Find and remove from open_files dict
+        for file_path, tab_idx in list(self.open_files.items()):
+            if tab_idx == index:
+                del self.open_files[file_path]
+                if file_path in self.file_modified_state:
+                    del self.file_modified_state[file_path]
+                break
+        
+        # If no tabs left, create a new untitled one
+        if self.tab_widget.count() == 1:
+            self.tab_widget.removeTab(index)
+            self.create_new_tab()
+        else:
+            self.tab_widget.removeTab(index)
+            # Update indices in open_files for tabs after the removed one
+            for i in range(index, self.tab_widget.count()):
+                for file_path, tab_idx in list(self.open_files.items()):
+                    if tab_idx > index:
+                        self.open_files[file_path] = tab_idx - 1
+    
+    def save_current_file(self):
+        """Save the current file."""
+        if self.current_file:
+            return self.save_to_file(self.current_file)
+        return self.save_file_as()
+    
     def new_file(self):
-        if self.maybe_save():
-            self.editor.clear()
-            self.current_file = None
-            self.setWindowTitle("TextEdit - Untitled")
+        self.create_new_tab()
     
     def new_folder(self):
         folder_name, ok = QInputDialog.getText(
@@ -541,13 +690,12 @@ class TextEditor(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Could not create folder:\n{e}")
     
     def open_file(self):
-        if self.maybe_save():
-            file_path, _ = QFileDialog.getOpenFileName(
-                self, "Open File", "",
-                "All Files (*);;Text Files (*.txt);;Python Files (*.py)"
-            )
-            if file_path:
-                self.load_file(file_path)
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Open File", "",
+            "All Files (*);;Text Files (*.txt);;Python Files (*.py)"
+        )
+        if file_path:
+            self.load_file(file_path)
     
     def open_folder(self):
         folder_path = QFileDialog.getExistingDirectory(
@@ -561,8 +709,7 @@ class TextEditor(QMainWindow):
     def open_file_from_tree(self, index):
         file_path = self.file_model.filePath(index)
         if not self.file_model.isDir(index):
-            if self.maybe_save():
-                self.load_file(file_path)
+            self.load_file(file_path)
     
     def show_file_tree_context_menu(self, position):
         """Display context menu for file tree items."""
@@ -611,12 +758,57 @@ class TextEditor(QMainWindow):
                 else:
                     os.remove(file_path)
                 
-                # If we deleted the currently open file, close it
+                # If we deleted the currently open file, close its tab
                 # Normalize paths for comparison (handle forward/back slashes)
-                if self.current_file and os.path.normpath(self.current_file) == os.path.normpath(file_path):
-                    self.editor.clear()
-                    self.current_file = None
-                    self.setWindowTitle("TextEdit - Untitled")
+                norm_file_path = os.path.normpath(file_path)
+                matching_file = None
+                for open_file_path in self.open_files.keys():
+                    if os.path.normpath(open_file_path) == norm_file_path:
+                        matching_file = open_file_path
+                        break
+                
+                if matching_file:
+                     tab_index = self.open_files[matching_file]
+                     # Mark this file as deleted so on_tab_changed won't restore it
+                     was_current = (self.current_file == matching_file)
+                     # Remove from tracking before removing tab so on_tab_changed won't find it
+                     del self.open_files[matching_file]
+                     if matching_file in self.file_modified_state:
+                         del self.file_modified_state[matching_file]
+                     # Now remove the tab (on_tab_changed will see file not in open_files)
+                     if self.tab_widget.count() == 1:
+                         self.tab_widget.removeTab(tab_index)
+                         self.create_new_tab()
+                     else:
+                         self.tab_widget.removeTab(tab_index)
+                         # Update indices in open_files for tabs after the removed one
+                         for i in range(tab_index, self.tab_widget.count()):
+                             for open_file_path, tab_idx in list(self.open_files.items()):
+                                 if tab_idx > tab_index:
+                                     self.open_files[open_file_path] = tab_idx - 1
+                     # Ensure current_file is cleared if this was the current file
+                     if was_current:
+                         self.current_file = None
+                         self.setWindowTitle("TextEdit - Untitled")
+                elif is_dir:
+                    # Check if any open files are in the deleted directory
+                    for open_file_path in list(self.open_files.keys()):
+                        if open_file_path.startswith(file_path):
+                            tab_index = self.open_files[open_file_path]
+                            del self.open_files[open_file_path]
+                            if open_file_path in self.file_modified_state:
+                                del self.file_modified_state[open_file_path]
+                            # Now remove the tab
+                            if self.tab_widget.count() == 1:
+                                self.tab_widget.removeTab(tab_index)
+                                self.create_new_tab()
+                            else:
+                                self.tab_widget.removeTab(tab_index)
+                                # Update indices in open_files for tabs after the removed one
+                                for i in range(tab_index, self.tab_widget.count()):
+                                    for other_file_path, tab_idx in list(self.open_files.items()):
+                                        if tab_idx > tab_index:
+                                            self.open_files[other_file_path] = tab_idx - 1
                 
                 # Refresh file model to stop watching the deleted path
                 root_path = self.file_model.rootPath()
@@ -626,9 +818,40 @@ class TextEditor(QMainWindow):
     
     def load_file(self, file_path):
         try:
+            # Check if file is already open in a different tab
+            if file_path in self.open_files and self.open_files[file_path] != self.tab_widget.currentIndex():
+                # Switch to existing tab
+                tab_index = self.open_files[file_path]
+                self.tab_widget.setCurrentIndex(tab_index)
+                return
+            
+            # Load file content
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            self.editor.setPlainText(content)
+            
+            # Use current tab if it's untitled and unmodified, otherwise create new tab
+            current_index = self.tab_widget.currentIndex()
+            current_editor = self.tab_widget.widget(current_index)
+            
+            if current_index >= 0 and self.current_file is None and not current_editor.document().isModified():
+                # Reuse current untitled tab
+                editor = current_editor
+                self.open_files[file_path] = current_index
+                self.file_modified_state[file_path] = False
+            elif file_path in self.open_files:
+                # File is already mapped to current tab, reuse it
+                editor = current_editor
+            else:
+                # Create new tab for this file
+                editor, _ = self.create_new_tab(file_path)
+            
+            editor.setPlainText(content)
+            editor.document().setModified(False)
+            
+            # Update tab title
+            tab_index = self.tab_widget.currentIndex()
+            self.tab_widget.setTabText(tab_index, os.path.basename(file_path))
+            
             self.current_file = file_path
             self.setWindowTitle(f"TextEdit - {file_path}")
             self.update_file_type(file_path)
@@ -653,9 +876,19 @@ class TextEditor(QMainWindow):
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(self.editor.toPlainText())
+            
+            # Update open_files mapping if new file
+            if file_path not in self.open_files:
+                self.open_files[file_path] = self.tab_widget.currentIndex()
+            
             self.current_file = file_path
             self.setWindowTitle(f"TextEdit - {file_path}")
             self.editor.document().setModified(False)
+            
+            # Update tab title to remove asterisk
+            tab_index = self.tab_widget.currentIndex()
+            self.tab_widget.setTabText(tab_index, os.path.basename(file_path))
+            
             self.update_file_type(file_path)
             return True
         except Exception as e:
@@ -676,15 +909,27 @@ class TextEditor(QMainWindow):
         return True
     
     def on_text_changed(self):
+        """Update title and tab when text changes."""
         title = self.windowTitle()
         if not title.endswith("*") and self.editor.document().isModified():
             self.setWindowTitle(title + " *")
+        
+        # Update tab title with asterisk
+        tab_index = self.tab_widget.currentIndex()
+        if tab_index >= 0:
+            tab_title = self.tab_widget.tabText(tab_index)
+            if self.editor.document().isModified() and not tab_title.endswith("*"):
+                self.tab_widget.setTabText(tab_index, tab_title + " *")
+            elif not self.editor.document().isModified() and tab_title.endswith("*"):
+                self.tab_widget.setTabText(tab_index, tab_title.rstrip("*").rstrip())
     
     def update_cursor_position(self):
-        cursor = self.editor.textCursor()
-        line = cursor.blockNumber() + 1
-        col = cursor.columnNumber() + 1
-        self.cursor_label.setText(f"Ln {line}, Col {col}")
+         if not hasattr(self, 'cursor_label') or self.editor is None:
+             return
+         cursor = self.editor.textCursor()
+         line = cursor.blockNumber() + 1
+         col = cursor.columnNumber() + 1
+         self.cursor_label.setText(f"Ln {line}, Col {col}")
     
     def update_folder_label(self, folder_path):
         folder_name = os.path.basename(folder_path) or folder_path
@@ -715,7 +960,11 @@ class TextEditor(QMainWindow):
         font = self.editor.font()
         font.setPointSize(font.pointSize() + 1)
         self.editor.setFont(font)
-        self.editor.line_number_area.setFont(font)
+        
+        # Also zoom line numbers independently
+        line_num_font = self.editor.line_number_area.font()
+        line_num_font.setPointSize(line_num_font.pointSize() + 1)
+        self.editor.line_number_area.setFont(line_num_font)
         self.show_zoom_indicator()
     
     def zoom_out(self):
@@ -723,7 +972,12 @@ class TextEditor(QMainWindow):
         if font.pointSize() > 6:
             font.setPointSize(font.pointSize() - 1)
             self.editor.setFont(font)
-            self.editor.line_number_area.setFont(font)
+            
+            # Also zoom line numbers independently
+            line_num_font = self.editor.line_number_area.font()
+            if line_num_font.pointSize() > 6:
+                line_num_font.setPointSize(line_num_font.pointSize() - 1)
+                self.editor.line_number_area.setFont(line_num_font)
         self.show_zoom_indicator()
     
     def show_zoom_indicator(self):
@@ -767,10 +1021,25 @@ class TextEditor(QMainWindow):
         )
     
     def closeEvent(self, event):
-        if self.maybe_save():
-            event.accept()
-        else:
-            event.ignore()
+        """Check all tabs for unsaved changes before closing."""
+        # Check each tab for unsaved changes
+        for i in range(self.tab_widget.count()):
+            editor = self.tab_widget.widget(i)
+            if editor and editor.document().isModified():
+                self.tab_widget.setCurrentIndex(i)
+                ret = QMessageBox.warning(
+                    self, "TextEdit",
+                    "The document has been modified.\nDo you want to save your changes?",
+                    QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
+                )
+                if ret == QMessageBox.Save:
+                    if not self.save_current_file():
+                        event.ignore()
+                        return
+                elif ret == QMessageBox.Cancel:
+                    event.ignore()
+                    return
+        event.accept()
 
 
 def main():

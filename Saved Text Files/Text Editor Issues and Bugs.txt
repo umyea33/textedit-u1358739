@@ -15,3 +15,5 @@ If something is added to a file then removed, it still shows that the file needs
 // Fixed  When zooming, it is impossible to tell if I am back at the default 100% or not.
 
 Scroll bar doesn't look that great.
+
+Sometimes when I open a file and make changes to it, then try to save it then it wants me to choose the file location and name even tho it already should know what it is.
