@@ -10,7 +10,7 @@ from PySide6.QtGui import (
     QAction, QKeySequence, QFont, QColor, QPainter, QTextFormat,
     QTextCursor, QFontMetrics, QPalette, QShortcut, QTextCharFormat
 )
-from PySide6.QtCore import Qt, QRect, QSize, QDir, Signal
+from PySide6.QtCore import Qt, QRect, QSize, QDir, Signal, QTimer
 
 
 class LineNumberArea(QWidget):
@@ -186,10 +186,12 @@ class TextEditor(QMainWindow):
     """Main text editor window."""
     
     def __init__(self):
-        super().__init__()
-        self.current_file = None
-        self.init_ui()
-        self.apply_dark_theme()
+         super().__init__()
+         self.current_file = None
+         self.zoom_indicator_timer = QTimer()
+         self.zoom_indicator_timer.timeout.connect(self.hide_zoom_indicator)
+         self.init_ui()
+         self.apply_dark_theme()
     
     def init_ui(self):
         self.setWindowTitle("TextEdit - Untitled")
@@ -379,18 +381,32 @@ class TextEditor(QMainWindow):
         help_menu.addAction(about_action)
     
     def create_status_bar(self):
-        self.status_bar = QStatusBar()
-        self.setStatusBar(self.status_bar)
-        
-        self.cursor_label = QLabel("Ln 1, Col 1")
-        self.encoding_label = QLabel("UTF-8")
-        self.file_type_label = QLabel("Plain Text")
-        
-        self.status_bar.addPermanentWidget(self.cursor_label)
-        self.status_bar.addPermanentWidget(QLabel("  |  "))
-        self.status_bar.addPermanentWidget(self.encoding_label)
-        self.status_bar.addPermanentWidget(QLabel("  |  "))
-        self.status_bar.addPermanentWidget(self.file_type_label)
+         self.status_bar = QStatusBar()
+         self.setStatusBar(self.status_bar)
+         
+         self.cursor_label = QLabel("Ln 1, Col 1")
+         self.encoding_label = QLabel("UTF-8")
+         self.file_type_label = QLabel("Plain Text")
+         
+         self.status_bar.addPermanentWidget(self.cursor_label)
+         self.status_bar.addPermanentWidget(QLabel("  |  "))
+         self.status_bar.addPermanentWidget(self.encoding_label)
+         self.status_bar.addPermanentWidget(QLabel("  |  "))
+         self.status_bar.addPermanentWidget(self.file_type_label)
+         
+         # Create zoom indicator (hidden by default)
+         self.zoom_indicator = QLabel()
+         self.zoom_indicator.setStyleSheet("""
+             background-color: #333333;
+             color: #cccccc;
+             padding: 5px 10px;
+             border: 1px solid #555555;
+             border-radius: 3px;
+             font-size: 12px;
+         """)
+         self.zoom_indicator.hide()
+         self.zoom_indicator.setParent(self)
+         self.update_zoom_indicator()
     
     def apply_dark_theme(self):
         dark_style = """
@@ -636,6 +652,7 @@ class TextEditor(QMainWindow):
         font.setPointSize(font.pointSize() + 1)
         self.editor.setFont(font)
         self.editor.line_number_area.setFont(font)
+        self.show_zoom_indicator()
     
     def zoom_out(self):
         font = self.editor.font()
@@ -643,6 +660,35 @@ class TextEditor(QMainWindow):
             font.setPointSize(font.pointSize() - 1)
             self.editor.setFont(font)
             self.editor.line_number_area.setFont(font)
+        self.show_zoom_indicator()
+    
+    def show_zoom_indicator(self):
+        """Display the zoom indicator popup near the menu bar."""
+        self.update_zoom_indicator()
+        self.zoom_indicator.adjustSize()
+        self.zoom_indicator.show()
+        
+        # Position the indicator at top right, aligned with menu bar
+        menubar = self.menuBar()
+        x = self.width() - self.zoom_indicator.width() - 10
+        y = menubar.height() + 5
+        self.zoom_indicator.move(x, y)
+        
+        # Auto-hide after 1 second
+        self.zoom_indicator_timer.stop()
+        self.zoom_indicator_timer.start(1000)
+    
+    def hide_zoom_indicator(self):
+        """Hide the zoom indicator."""
+        self.zoom_indicator.hide()
+        self.zoom_indicator_timer.stop()
+    
+    def update_zoom_indicator(self):
+        """Update the zoom indicator text with current zoom percentage."""
+        font = self.editor.font()
+        # Default font size is 11pt
+        zoom_percent = int((font.pointSize() / 11) * 100)
+        self.zoom_indicator.setText(f"{zoom_percent}%")
     
     def show_about(self):
         QMessageBox.about(

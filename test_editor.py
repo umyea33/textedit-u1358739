@@ -2,7 +2,7 @@ import pytest
 import os
 import tempfile
 from pathlib import Path
-from PySide6.QtCore import Qt, QPoint
+from PySide6.QtCore import Qt, QPoint, QTimer
 from PySide6.QtGui import QTextCursor, QFont
 from PySide6.QtWidgets import QApplication, QMessageBox, QFileDialog
 
@@ -1500,6 +1500,149 @@ class TestFolderLabelDisplay:
         # Check that dark theme colors are applied
         assert "#2a2d2e" in window.folder_label.styleSheet() or \
                "#cccccc" in window.folder_label.styleSheet()
+
+    def test_zoom_indicator_exists(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        assert hasattr(window, 'zoom_indicator')
+        assert window.zoom_indicator is not None
+
+    def test_zoom_indicator_hidden_by_default(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        assert not window.zoom_indicator.isVisible()
+
+    def test_zoom_indicator_shows_on_zoom_in(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.zoom_in()
+        
+        assert window.zoom_indicator.isVisible()
+        assert "%" in window.zoom_indicator.text()
+
+    def test_zoom_indicator_shows_on_zoom_out(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Zoom in first to ensure we can zoom out
+        window.zoom_in()
+        window.zoom_out()
+        
+        assert window.zoom_indicator.isVisible()
+        assert "%" in window.zoom_indicator.text()
+
+    def test_zoom_indicator_displays_correct_percentage(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Default font size is 11pt, so 100% initially
+        window.update_zoom_indicator()
+        assert "100%" in window.zoom_indicator.text()
+        
+        # After zoom in (font size becomes 12pt)
+        window.zoom_in()
+        assert "109%" in window.zoom_indicator.text() or "110%" in window.zoom_indicator.text()
+
+    def test_zoom_indicator_increases_on_zoom_in(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        font = window.editor.font()
+        initial_size = font.pointSize()
+        
+        window.zoom_in()
+        font = window.editor.font()
+        
+        assert font.pointSize() == initial_size + 1
+
+    def test_zoom_indicator_decreases_on_zoom_out(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Zoom in first
+        window.zoom_in()
+        font = window.editor.font()
+        size_after_zoom_in = font.pointSize()
+        
+        # Then zoom out
+        window.zoom_out()
+        font = window.editor.font()
+        
+        assert font.pointSize() == size_after_zoom_in - 1
+
+    def test_zoom_indicator_doesnt_go_below_6pt(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Set font to minimum size (6pt)
+        font = window.editor.font()
+        font.setPointSize(6)
+        window.editor.setFont(font)
+        window.editor.line_number_area.setFont(font)
+        
+        # Try to zoom out
+        window.zoom_out()
+        
+        # Should still be 6pt
+        font = window.editor.font()
+        assert font.pointSize() == 6
+
+    def test_zoom_indicator_timer_active_on_show(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.show_zoom_indicator()
+        
+        assert window.zoom_indicator_timer.isActive()
+
+    def test_zoom_indicator_auto_hides(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.show_zoom_indicator()
+        assert window.zoom_indicator.isVisible()
+        
+        # Wait for timer to trigger (1 second)
+        qtbot.wait(1100)
+        
+        assert not window.zoom_indicator.isVisible()
+        assert not window.zoom_indicator_timer.isActive()
+
+    def test_zoom_indicator_positioned_top_right(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.show_zoom_indicator()
+        
+        # Check that indicator is positioned near the top right
+        indicator_x = window.zoom_indicator.x()
+        indicator_y = window.zoom_indicator.y()
+        indicator_width = window.zoom_indicator.width()
+        menubar_height = window.menuBar().height()
+        
+        # Should be below the menu bar
+        assert indicator_y > menubar_height
+        # Should be on the right side (accounting for indicator width)
+        assert indicator_x + indicator_width > window.width() * 0.7
 
 
 class TestFolderOperations:
