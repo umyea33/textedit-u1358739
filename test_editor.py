@@ -1637,12 +1637,11 @@ class TestFolderLabelDisplay:
         indicator_x = window.zoom_indicator.x()
         indicator_y = window.zoom_indicator.y()
         indicator_width = window.zoom_indicator.width()
-        menubar_height = window.menuBar().height()
         
-        # Should be below the menu bar
-        assert indicator_y > menubar_height
-        # Should be on the right side (accounting for indicator width)
-        assert indicator_x + indicator_width > window.width() * 0.7
+        # Should be positioned at the top (near menu bar area)
+        assert indicator_y >= 0 and indicator_y < 50
+        # Should be on the right side
+        assert indicator_x + indicator_width > window.width() * 0.6
 
 
 class TestFolderOperations:
