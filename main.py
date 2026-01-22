@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QPlainTextEdit, QWidget, QVBoxLayout,
     QHBoxLayout, QFileDialog, QMessageBox, QStatusBar, QMenuBar,
     QToolBar, QLabel, QLineEdit, QDialog, QPushButton, QSplitter,
-    QTreeView, QFileSystemModel, QFrame, QTextEdit, QInputDialog
+    QTreeView, QFileSystemModel, QFrame, QTextEdit, QInputDialog, QMenu
 )
 from PySide6.QtGui import (
     QAction, QKeySequence, QFont, QColor, QPainter, QTextFormat,
@@ -245,6 +245,8 @@ class TextEditor(QMainWindow):
         self.file_tree.setMinimumWidth(200)
         self.file_tree.setMaximumWidth(300)
         self.file_tree.doubleClicked.connect(self.open_file_from_tree)
+        self.file_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.file_tree.customContextMenuRequested.connect(self.show_file_tree_context_menu)
         sidebar_layout.addWidget(self.file_tree)
         
         self.update_folder_label(QDir.currentPath())
@@ -561,6 +563,51 @@ class TextEditor(QMainWindow):
         if not self.file_model.isDir(index):
             if self.maybe_save():
                 self.load_file(file_path)
+    
+    def show_file_tree_context_menu(self, position):
+        index = self.file_tree.indexAt(position)
+        if not index.isValid():
+            return
+        
+        file_path = self.file_model.filePath(index)
+        is_dir = self.file_model.isDir(index)
+        
+        menu = QMenu(self)
+        
+        delete_action = menu.addAction("Delete")
+        action = menu.exec(self.file_tree.mapToGlobal(position))
+        
+        if action == delete_action:
+            self.delete_file_or_folder(file_path, is_dir)
+    
+    def delete_file_or_folder(self, path, is_dir):
+        """Delete a file or folder after user confirmation."""
+        item_type = "folder" if is_dir else "file"
+        item_name = os.path.basename(path)
+        
+        reply = QMessageBox.question(
+            self,
+            "Confirm Delete",
+            f"Are you sure you want to delete this {item_type}?\n\n{item_name}",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            try:
+                if is_dir:
+                    import shutil
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
+                
+                # If the deleted file was currently open, close it
+                if self.current_file == path:
+                    self.editor.clear()
+                    self.current_file = None
+                    self.setWindowTitle("TextEdit - Untitled")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Could not delete {item_type}:\n{e}")
     
     def load_file(self, file_path):
         try:
