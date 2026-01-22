@@ -14,6 +14,68 @@ from PySide6.QtGui import (
 from PySide6.QtCore import Qt, QRect, QSize, QDir, Signal, QTimer, QPoint
 
 
+class WelcomeScreen(QWidget):
+    """Welcome screen shown when no tabs are open."""
+    
+    open_file_clicked = Signal()
+    new_file_clicked = Signal()
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.init_ui()
+        self.apply_dark_theme()
+    
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Center the buttons
+        layout.addStretch()
+        
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        # New File button
+        new_file_btn = QPushButton("New File")
+        new_file_btn.setMinimumWidth(150)
+        new_file_btn.setMinimumHeight(40)
+        new_file_btn.clicked.connect(self.new_file_clicked.emit)
+        button_layout.addWidget(new_file_btn)
+        
+        # Open File button
+        open_file_btn = QPushButton("Open File")
+        open_file_btn.setMinimumWidth(150)
+        open_file_btn.setMinimumHeight(40)
+        open_file_btn.clicked.connect(self.open_file_clicked.emit)
+        button_layout.addWidget(open_file_btn)
+        
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
+        layout.addStretch()
+    
+    def apply_dark_theme(self):
+        self.setStyleSheet("""
+            WelcomeScreen {
+                background-color: #1e1e1e;
+            }
+            QPushButton {
+                background-color: #0ea5e9;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                font-size: 14px;
+                font-weight: bold;
+                padding: 10px;
+            }
+            QPushButton:hover {
+                background-color: #0284c7;
+            }
+            QPushButton:pressed {
+                background-color: #075985;
+            }
+        """)
+
+
 class CustomTabBar(QTabBar):
     """Custom tab bar with close buttons."""
     
@@ -310,11 +372,25 @@ class TextEditor(QMainWindow):
         self.tab_widget.close_requested.connect(self.close_tab)
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
         
+        # Welcome screen (shown when no tabs)
+        self.welcome_screen = WelcomeScreen()
+        self.welcome_screen.open_file_clicked.connect(self.open_file)
+        self.welcome_screen.new_file_clicked.connect(self.new_file_without_tab_check)
+        self.welcome_screen.hide()
+        
+        # Container for tab widget and welcome screen
+        editor_container = QWidget()
+        editor_layout = QVBoxLayout(editor_container)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        editor_layout.setSpacing(0)
+        editor_layout.addWidget(self.tab_widget)
+        editor_layout.addWidget(self.welcome_screen)
+        
         # Create initial untitled editor
         self.create_new_tab()
         
         splitter.addWidget(sidebar_widget)
-        splitter.addWidget(self.tab_widget)
+        splitter.addWidget(editor_container)
         splitter.setSizes([200, 1000])
         
         main_layout.addWidget(splitter)
@@ -587,6 +663,11 @@ class TextEditor(QMainWindow):
             tab_name = "Untitled"
             file_path = None
         
+        # Show tab widget and hide welcome screen if they were hidden
+        if self.tab_widget.isHidden():
+            self.tab_widget.show()
+            self.welcome_screen.hide()
+        
         index = self.tab_widget.addTab(editor, tab_name)
         if file_path:
             self.open_files[file_path] = index
@@ -654,17 +735,21 @@ class TextEditor(QMainWindow):
                     del self.file_modified_state[file_path]
                 break
         
-        # If no tabs left, create a new untitled one
-        if self.tab_widget.count() == 1:
-            self.tab_widget.removeTab(index)
-            self.create_new_tab()
-        else:
-            self.tab_widget.removeTab(index)
-            # Update indices in open_files for tabs after the removed one
-            for i in range(index, self.tab_widget.count()):
-                for file_path, tab_idx in list(self.open_files.items()):
-                    if tab_idx > index:
-                        self.open_files[file_path] = tab_idx - 1
+        # Remove the tab
+        self.tab_widget.removeTab(index)
+        
+        # Update indices in open_files for tabs after the removed one
+        for i in range(index, self.tab_widget.count()):
+            for file_path, tab_idx in list(self.open_files.items()):
+                if tab_idx > index:
+                    self.open_files[file_path] = tab_idx - 1
+        
+        # If no tabs left, show welcome screen
+        if self.tab_widget.count() == 0:
+            self.tab_widget.hide()
+            self.welcome_screen.show()
+            self.current_file = None
+            self.setWindowTitle("TextEdit")
     
     def save_current_file(self):
         """Save the current file."""
@@ -672,7 +757,12 @@ class TextEditor(QMainWindow):
             return self.save_to_file(self.current_file)
         return self.save_file_as()
     
+    def new_file_without_tab_check(self):
+        """Create new file without welcome screen check (for button clicks)."""
+        self.create_new_tab()
+    
     def new_file(self):
+        """Create new file (can be called from menu)."""
         self.create_new_tab()
     
     def new_folder(self):

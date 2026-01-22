@@ -2137,20 +2137,21 @@ class TestTabs:
          assert window.tab_widget.currentIndex() == first_tab_index
 
     def test_close_tab_with_unsaved_changes(self, qtbot, monkeypatch):
-         """Test closing a tab with unsaved changes prompts user."""
-         window = TextEditor()
-         qtbot.addWidget(window)
-         editor = window.tab_widget.widget(0)
-         editor.setPlainText("unsaved content")
-         
-         # Mock the dialog to return Discard
-         monkeypatch.setattr(
-            "main.QMessageBox.warning",
-            lambda *args, **kwargs: QMessageBox.Discard
-         )
-         
-         window.close_tab(0)
-         assert window.tab_widget.count() == 1  # New untitled tab created
+        """Test closing a tab with unsaved changes prompts user."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        editor = window.tab_widget.widget(0)
+        editor.setPlainText("unsaved content")
+        
+        # Mock the dialog to return Discard
+        monkeypatch.setattr(
+           "main.QMessageBox.warning",
+           lambda *args, **kwargs: QMessageBox.Discard
+        )
+        
+        window.close_tab(0)
+        # After closing the last tab, all tabs should be removed
+        assert window.tab_widget.count() == 0
 
     def test_open_files_tracking(self, qtbot, tmp_path):
          """Test that open files are properly tracked."""

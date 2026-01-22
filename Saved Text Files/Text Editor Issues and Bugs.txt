@@ -17,3 +17,6 @@ If something is added to a file then removed, it still shows that the file needs
 Scroll bar doesn't look that great.
 
 Sometimes when I open a file and make changes to it, then try to save it then it wants me to choose the file location and name even tho it already should know what it is.
+I can't exit the last file inside the text editor.
+It would be nice if when no file is opened then it shows two buttons in the center of the screen.  New file and Open File.
+// Fixed  When I make changes to a file and it is the only file opened, then when I try to exit then choose save it tries to save it as a new file and asks me for a new filepath and name.
