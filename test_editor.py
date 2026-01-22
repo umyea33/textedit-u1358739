@@ -252,6 +252,20 @@ class TestTextEditor:
         assert any("Sidebar" in t for t in action_texts)
         assert any("Zoom" in t for t in action_texts)
 
+    def test_new_folder_shortcut_configured(self, qtbot):
+        import inspect
+        from main import TextEditor
+        
+        source = inspect.getsource(TextEditor.create_menu_bar)
+        assert 'new_folder_action.setShortcut("Ctrl+Shift+N")' in source
+
+    def test_open_folder_shortcut_configured(self, qtbot):
+        import inspect
+        from main import TextEditor
+        
+        source = inspect.getsource(TextEditor.create_menu_bar)
+        assert 'open_folder_action.setShortcut("Ctrl+Shift+O")' in source
+
     def test_dark_theme_applied(self, qtbot):
         window = TextEditor()
         qtbot.addWidget(window)
