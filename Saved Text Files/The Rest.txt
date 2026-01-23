@@ -1,0 +1,14 @@
+Must
+Implement multifile find and replace.
+
+Should
+Scroll bar doesn't look that great.
+When I press down when I am on the last line, the cursor doesn't go to the end of the line.  It just stays there.
+When the split view button is disabled, then display maximun views reached when hovering over the button.
+Make so if a cursor is on that view, then that view is the active view and when a new file is opened it is opened in that view.
+
+Could
+Can't drag and drop a file or folder into another folder in the sidebar.
+Can't drag and drop tabs from one view over to another view.
+When there are too many tabs in a view it adds arrows that are kinda stupid.  I want a small horizontal scroll bar instead.
+Make so find and replace highlights all instances of the "find" and emphasizes the one that it is currently on.

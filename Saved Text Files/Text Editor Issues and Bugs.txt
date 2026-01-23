@@ -11,7 +11,7 @@ Can't drag and drop a file or folder into another folder in the side bar.
 // Fixed  No shortcuts for create folder and open folder.
 
 // Fixed  Currently can't change which folder is shown in the side bar.
-If something is added to a file then removed, it still shows that the file needs to be saved, but that is what vs code does too.
+// Fixed  If something is added to a file then removed, it still shows that the file needs to be saved, but that is what vs code does too.
 // Fixed  When zooming, it is impossible to tell if I am back at the default 100% or not.
 
 Scroll bar doesn't look that great.
@@ -25,5 +25,5 @@ Scroll bar doesn't look that great.
 
 // Implemented  Split view with up to 3 panes, close buttons for each pane, and split button in tab bar.
 Implement multifile find and replace.
-The home screen randomly says no file at the top left.
+// Fixed  The home screen randomly says no file at the top left.
 When the split view button is disabled then display Maximum View Reached.

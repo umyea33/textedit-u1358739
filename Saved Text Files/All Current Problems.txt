@@ -9,4 +9,4 @@ Skipped:  In the side bar, I want to be able to drag a file into a folder to mov
 Still Not Good:  The scroll bar background doesn't look that great.  Keep the scroll bar the same color, but change the background to be just barely barely lighter than the gray of the normal background.
 Bug:  When I change a file, then undo my changes either by pressing undo or just typing to make the file how it was when it was last saved, then the changes indicator is still there.  I want the change indicator to mean that this file is now different than it was when it was last saved.  So if I open a file, type "the", then backspace "the" I want the changed idicator * to go away.
 Skipped:  When there are two many tabs, instead of having arrows, then add a tiny scroll bar, and make it so I can smoothly scroll from left to right using the scroll bar or a mouse or a mouse pad.
-Better, but the active one is still lighter.  When there are multiple tabs, switch the look of the active tab and the non active tabs.
+Better, but the active one is still lighter.  Actually, I like it.  When there are multiple tabs, switch the look of the active tab and the non active tabs.
