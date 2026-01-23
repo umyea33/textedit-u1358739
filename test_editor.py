@@ -2473,6 +2473,116 @@ class TestMultiTabFunctionality:
         
         assert window.editor.hasFocus(), "Editor should have focus after opening file"
 
+    def test_current_file_preserved_after_discarding_untitled_tab(self, qtbot, tmp_path, monkeypatch):
+        """Test that current_file is correct after closing untitled tab with discard.
+        
+        Bug: When you modify untitled tab, open existing file, close untitled with discard,
+        then save the existing file - Save As dialog appears instead of saving to existing path.
+        """
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Modify the untitled first tab
+        editor1 = window.tab_widget.widget(0)
+        editor1.setPlainText("unsaved content")
+        editor1.document().setModified(True)
+        
+        # Open an existing file (creates new tab at index 1)
+        existing_file = tmp_path / "existing.txt"
+        existing_file.write_text("original content")
+        window.load_file(str(existing_file))
+        
+        # Verify we're on the existing file tab
+        assert window.tab_widget.currentIndex() == 1
+        assert window.current_file == str(existing_file)
+        
+        # Close the untitled tab (index 0) with discard
+        monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: QMessageBox.Discard
+        )
+        window.close_tab(0)
+        qtbot.wait(50)
+        
+        # Now the existing file should be at index 0 and current_file should be set
+        assert window.tab_widget.count() == 1
+        assert window.tab_widget.currentIndex() == 0
+        assert window.current_file == str(existing_file), \
+            f"current_file should be '{existing_file}' but is '{window.current_file}'"
+        
+        # Modify and save - should NOT show Save As dialog
+        window.editor.setPlainText("modified content")
+        
+        save_as_called = []
+        original_get_save = QFileDialog.getSaveFileName
+        monkeypatch.setattr(
+            "main.QFileDialog.getSaveFileName",
+            lambda *args, **kwargs: (save_as_called.append(True), ("", ""))[1]
+        )
+        
+        window.save_file()
+        
+        assert len(save_as_called) == 0, "Save As dialog should NOT have been shown"
+        assert existing_file.read_text() == "modified content"
+
+    def test_current_file_preserved_after_saving_untitled_tab(self, qtbot, tmp_path, monkeypatch):
+        """Test that current_file is correct after closing untitled tab with save.
+        
+        Bug: Same issue occurs when saving the untitled tab before closing.
+        """
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Modify the untitled first tab
+        editor1 = window.tab_widget.widget(0)
+        editor1.setPlainText("unsaved content")
+        editor1.document().setModified(True)
+        
+        # Open an existing file
+        existing_file = tmp_path / "existing.txt"
+        existing_file.write_text("original content")
+        window.load_file(str(existing_file))
+        
+        # Close the untitled tab (index 0) with save
+        monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: QMessageBox.Save
+        )
+        
+        # Mock save dialog for the untitled file
+        untitled_save_path = str(tmp_path / "saved_untitled.txt")
+        monkeypatch.setattr(
+            "main.QFileDialog.getSaveFileName",
+            lambda *args, **kwargs: (untitled_save_path, "All Files (*)")
+        )
+        
+        window.close_tab(0)
+        qtbot.wait(50)
+        
+        # Now the existing file should be current
+        assert window.tab_widget.count() == 1
+        assert window.current_file == str(existing_file), \
+            f"current_file should be '{existing_file}' but is '{window.current_file}'"
+        
+        # Modify the existing file
+        window.editor.setPlainText("modified existing content")
+        
+        # Reset the mock to track if Save As is called again
+        save_as_called = []
+        monkeypatch.setattr(
+            "main.QFileDialog.getSaveFileName",
+            lambda *args, **kwargs: (save_as_called.append(True), ("", ""))[1]
+        )
+        
+        window.save_file()
+        
+        assert len(save_as_called) == 0, "Save As dialog should NOT have been shown"
+        assert existing_file.read_text() == "modified existing content"
+
     def test_save_untitled_tab_when_not_current_shows_save_dialog(self, qtbot, tmp_path, monkeypatch):
         """Test that saving an untitled modified tab shows save dialog even when it's not the current tab.
         

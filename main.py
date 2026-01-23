@@ -779,14 +779,14 @@ class TextEditor(QMainWindow):
                     del self.file_modified_state[file_path]
                 break
         
-        # Remove the tab
-        self.tab_widget.removeTab(index)
+        # Update indices in open_files for tabs after the removed one BEFORE removing
+        # This ensures on_tab_changed can find the correct file when it fires
+        for file_path, tab_idx in list(self.open_files.items()):
+            if tab_idx > index:
+                self.open_files[file_path] = tab_idx - 1
         
-        # Update indices in open_files for tabs after the removed one
-        for i in range(index, self.tab_widget.count()):
-            for file_path, tab_idx in list(self.open_files.items()):
-                if tab_idx > index:
-                    self.open_files[file_path] = tab_idx - 1
+        # Remove the tab (this triggers on_tab_changed)
+        self.tab_widget.removeTab(index)
         
         # If no tabs left, show welcome screen
         if self.tab_widget.count() == 0:
