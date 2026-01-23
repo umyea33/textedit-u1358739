@@ -1032,36 +1032,56 @@ class TextEditor(QMainWindow):
                 color: white;
             }
             QScrollBar:vertical {
-                background-color: #252526;
+                background-color: #1e1e1e;
                 width: 14px;
                 margin: 0;
+                border: none;
+            }
+            QScrollBar::groove:vertical {
+                background-color: #1e1e1e;
+                border: none;
+            }
+            QScrollBar::sub-page:vertical, QScrollBar::add-page:vertical {
+                background-color: #1e1e1e;
             }
             QScrollBar::handle:vertical {
                 background-color: #5a5a5a;
                 min-height: 20px;
                 border-radius: 7px;
+                border: none;
             }
             QScrollBar::handle:vertical:hover {
                 background-color: #787878;
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 height: 0;
+                background-color: #1e1e1e;
             }
             QScrollBar:horizontal {
-                background-color: #252526;
+                background-color: #1e1e1e;
                 height: 14px;
                 margin: 0;
+                border: none;
+            }
+            QScrollBar::groove:horizontal {
+                background-color: #1e1e1e;
+                border: none;
+            }
+            QScrollBar::sub-page:horizontal, QScrollBar::add-page:horizontal {
+                background-color: #1e1e1e;
             }
             QScrollBar::handle:horizontal {
                 background-color: #5a5a5a;
                 min-width: 20px;
                 border-radius: 7px;
+                border: none;
             }
             QScrollBar::handle:horizontal:hover {
                 background-color: #787878;
             }
             QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
                 width: 0;
+                background-color: #1e1e1e;
             }
             QSplitter::handle {
                 background-color: #3c3c3c;
