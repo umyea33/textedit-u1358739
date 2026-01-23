@@ -1,0 +1,12 @@
+Bug:  Moving from one view to two views increases the vertical size of the top pannel because the close button is too tall.  Make the close button shorter and overall smaller.  I don't want the size of that pannel to change when the number of pannels is changed.
+Make the close view button a little lighter color so it is more visible.  Do the same with the split view button.
+When I hover over the split button it makes the icon even harder to see.  Make the hover background a dark gray that is just barely lighter than the normal background.
+When showing the "home/welcome screen" get rid of the top pannel that says "no file".
+Bug:  When multiple views are open, and I open a new file, that file should be added to the most recently active view.  Right now when I have two files opened and my cursor is active on one view, opening a new file brings it to the other view (the first view) for some reason.
+That would be cool if I could drag and drop tabs over to other views when more than one view is oppened.  When the last tab in a view is dropped onto a different view then just delete the view that no longer has any tabs.
+Bug:  For some reason the folder name that is in the top left at the top of the side bar has extra random characters before the actual name.  Ensure that the name matches the name of the file.
+In the side bar, I want to be able to drag a file into a folder to move it.  I also want to be able to drag a folder into a different folder to move it.
+The scroll bar background doesn't look that great.  Keep the scroll bar the same color, but change the background to be just barely barely lighter than the gray of the normal background.
+Bug:  When I change a file, then undo my changes either by pressing undo or just typing to make the file how it was when it was last saved, then the changes indicator is still there.  I want the change indicator to mean that this file is now different than it was when it was last saved.  So if I open a file, type "the", then backspace "the" I want the changed idicator * to go away.
+When there are two many tabs, instead of having arrows, then add a tiny scroll bar, and make it so I can smoothly scroll from left to right using the scroll bar or a mouse or a mouse pad.
+When there are multiple tabs, switch the look of the active tab and the non active tabs.
