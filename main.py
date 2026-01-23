@@ -1261,6 +1261,8 @@ class TextEditor(QMainWindow):
             current_index = self.tab_widget.currentIndex()
             if current_index >= 0:
                 self.on_tab_changed(current_index)
+            # Set focus to the editor in the active pane
+            self.editor.setFocus()
     
     def create_new_tab(self, file_path=None):
         """Create a new editor tab."""

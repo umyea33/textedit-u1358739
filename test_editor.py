@@ -3169,6 +3169,58 @@ class TestMultiFileSearchBugFix:
             window.close()
 
 
+class TestViewFocus:
+    """Tests for view/pane focus behavior."""
+    
+    def test_active_view_gets_focus(self, qtbot, tmp_path):
+        """Test that when a view becomes active, the cursor focuses on its editor.
+        
+        Bug: When a view becomes active, the cursor/focus should move to the editor
+        in that view, but currently it doesn't.
+        """
+        # Create editor window
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Get the first pane
+        pane1 = window.active_pane
+        
+        # Create a test file
+        test_file1 = tmp_path / "file1.txt"
+        test_file1.write_text("file 1 content")
+        
+        # Open file in pane 1
+        window.load_file(str(test_file1))
+        
+        # Verify pane 1 editor has focus
+        assert pane1.tab_widget.currentWidget().hasFocus(), "Pane 1 editor should have focus initially"
+        
+        # Create a second view
+        window.add_split_view()
+        pane2 = window.split_panes[1]
+        
+        # Pane 2 should be active
+        assert window.active_pane == pane2
+        
+        # Verify pane 2 editor has focus
+        pane2_editor = pane2.tab_widget.currentWidget()
+        assert pane2_editor is not None, "Pane 2 should have an editor"
+        assert pane2_editor.hasFocus(), "Pane 2 editor should have focus when pane becomes active"
+        
+        # Now click on pane 1 to make it active
+        qtbot.mouseClick(pane1, Qt.LeftButton)
+        
+        # Verify pane 1 is now active
+        assert window.active_pane == pane1
+        
+        # Verify pane 1 editor now has focus
+        pane1_editor = pane1.tab_widget.currentWidget()
+        assert pane1_editor is not None, "Pane 1 should have an editor"
+        assert pane1_editor.hasFocus(), "Pane 1 editor should have focus when pane becomes active"
+
+
 class TestOpenFileInMultipleViews:
     """Tests for opening files in multiple views."""
     
