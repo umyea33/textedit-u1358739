@@ -382,6 +382,8 @@ class FindReplaceDialog(QDialog):
         self.editor = editor
         self.setWindowTitle("Find and Replace")
         self.setFixedSize(400, 150)
+        self.current_match_index = 0
+        self.all_matches = []
         self.setup_ui()
     
     def setup_ui(self):
@@ -412,21 +414,95 @@ class FindReplaceDialog(QDialog):
         self.replace_all_btn.clicked.connect(self.replace_all)
         layout.addWidget(self.replace_all_btn)
     
+    def highlight_all_matches(self):
+        """Highlight all instances of the search text."""
+        text = self.find_input.text()
+        self.all_matches = []
+        
+        # Clear previous highlights
+        cursor = self.editor.textCursor()
+        cursor.select(QTextCursor.Document)
+        format = QTextCharFormat()
+        cursor.setCharFormat(format)
+        
+        if not text:
+            return
+        
+        # Find all matches
+        document = self.editor.document()
+        cursor = QTextCursor(document)
+        cursor.movePosition(QTextCursor.Start)
+        
+        while True:
+            cursor = document.find(text, cursor)
+            if cursor.isNull():
+                break
+            
+            self.all_matches.append((cursor.selectionStart(), cursor.selectionEnd()))
+            
+            # Highlight this match (non-emphasized)
+            format = QTextCharFormat()
+            format.setBackground(QColor("#555555"))
+            format.setForeground(QColor("#ffffff"))
+            cursor.setCharFormat(format)
+            
+            # Move cursor forward to find next match
+            cursor.movePosition(QTextCursor.EndOfWord)
+    
+    def highlight_current_match(self, start, end):
+        """Highlight a specific match with emphasis."""
+        # Create cursor for current match
+        cursor = self.editor.textCursor()
+        cursor.setPosition(start)
+        cursor.setPosition(end, QTextCursor.KeepAnchor)
+        
+        # Highlight with emphasis
+        format = QTextCharFormat()
+        format.setBackground(QColor("#ffff00"))
+        format.setForeground(QColor("#000000"))
+        format.setFontWeight(700)
+        cursor.setCharFormat(format)
+        
+        # Set cursor position to this match
+        self.editor.setTextCursor(cursor)
+    
     def find_next(self):
         text = self.find_input.text()
         if text:
-            found = self.editor.find(text)
-            if not found:
+            # Find using Qt's built-in find
+            cursor = self.editor.textCursor()
+            
+            # If there's a current selection, move past it before searching for next
+            if cursor.hasSelection():
+                cursor.setPosition(cursor.selectionEnd())
+            
+            self.editor.setTextCursor(cursor)
+            
+            if self.editor.find(text):
+                # Highlight all matches to refresh
+                self.highlight_all_matches()
+                # Emphasize the current selection
+                cursor = self.editor.textCursor()
+                if cursor.hasSelection():
+                    self.highlight_current_match(cursor.selectionStart(), cursor.selectionEnd())
+            else:
+                # Wrap around to start
                 cursor = self.editor.textCursor()
                 cursor.movePosition(QTextCursor.Start)
                 self.editor.setTextCursor(cursor)
-                self.editor.find(text)
+                if self.editor.find(text):
+                    self.highlight_all_matches()
+                    cursor = self.editor.textCursor()
+                    if cursor.hasSelection():
+                        self.highlight_current_match(cursor.selectionStart(), cursor.selectionEnd())
     
     def replace(self):
         cursor = self.editor.textCursor()
         if cursor.hasSelection():
             cursor.insertText(self.replace_input.text())
-        self.find_next()
+        self.highlight_all_matches()
+        if self.all_matches:
+            self.find_next()
     
     def replace_all(self):
         find_text = self.find_input.text()
@@ -441,6 +517,8 @@ class FindReplaceDialog(QDialog):
                 cursor.select(QTextCursor.Document)
                 cursor.insertText(new_content)
                 cursor.endEditBlock()
+                # Don't highlight after replace_all - it interferes with undo
+                # The highlighting will be updated if the user makes another find
 
 
 class SearchResultButton(QWidget):
