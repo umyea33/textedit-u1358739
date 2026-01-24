@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QFileDialog, QMessageBox, QStatusBar, QMenuBar,
     QToolBar, QLabel, QLineEdit, QDialog, QPushButton, QSplitter,
     QTreeView, QFileSystemModel, QFrame, QTextEdit, QInputDialog, QMenu,
-    QTabWidget, QTabBar, QStyle, QScrollArea
+    QTabWidget, QTabBar, QStyle, QScrollArea, QToolTip
 )
 from PySide6.QtGui import (
     QAction, QKeySequence, QFont, QColor, QPainter, QTextFormat,
@@ -216,6 +216,25 @@ class CustomTabWidget(QTabWidget):
                 background-color: #3a3a3d;
             }
         """)
+        # Install event filter to show tooltip on click when disabled
+        self.split_button.installEventFilter(self)
+        self.split_button.setMouseTracking(True)
+        self._tooltip_active = False
+        
+        # Custom tooltip label (avoids Qt's tooltip hiding behavior)
+        self._custom_tooltip = QLabel(self.split_button.toolTip())
+        self._custom_tooltip.setWindowFlags(Qt.ToolTip)
+        self._custom_tooltip.setStyleSheet("""
+            QLabel {
+                background-color: #3a3a3d;
+                color: #ffffff;
+                border: 1px solid #5a5a5d;
+                padding: 4px 8px;
+                border-radius: 3px;
+            }
+        """)
+        self._custom_tooltip.hide()
+        
         self.setCornerWidget(self.split_button, Qt.TopRightCorner)
         
         self.setStyleSheet("""
@@ -283,8 +302,34 @@ class CustomTabWidget(QTabWidget):
         self.split_button.setEnabled(enabled)
         if enabled:
             self.split_button.setToolTip("Split Editor")
+            self._custom_tooltip.setText("Split Editor")
         else:
             self.split_button.setToolTip("Maximum Views Reached")
+            self._custom_tooltip.setText("Maximum Views Reached")
+    
+    def _show_custom_tooltip(self):
+        """Show the custom tooltip for the disabled split button."""
+        pos = self.split_button.mapToGlobal(QPoint(0, self.split_button.height()))
+        self._custom_tooltip.move(pos)
+        self._custom_tooltip.show()
+    
+    def _hide_custom_tooltip(self):
+        """Hide the custom tooltip."""
+        self._custom_tooltip.hide()
+    
+    def eventFilter(self, obj, event):
+        """Show tooltip when clicking on disabled split button, hide when mouse leaves."""
+        if obj == self.split_button and not self.split_button.isEnabled():
+            if event.type() == event.Type.MouseButtonPress:
+                self._tooltip_active = True
+                self._show_custom_tooltip()
+                return True
+            elif event.type() == event.Type.MouseButtonRelease:
+                return True
+            elif event.type() == event.Type.Leave:
+                self._tooltip_active = False
+                self._hide_custom_tooltip()
+        return super().eventFilter(obj, event)
 
 
 class SplitEditorPane(QWidget):

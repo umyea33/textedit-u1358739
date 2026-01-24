@@ -3416,7 +3416,7 @@ class TestSplitViewButton:
         
         # After reaching max panes, split button should be disabled with new tooltip
         assert not window.tab_widget.split_button.isEnabled()
-        assert window.tab_widget.split_button.toolTip() == "Maximum views reached"
+        assert window.tab_widget.split_button.toolTip() == "Maximum Views Reached"
         
         # Close a pane to re-enable it
         window.close_split_pane(window.split_panes[0])
@@ -4635,3 +4635,71 @@ class TestUntitledDocumentModifiedState:
             qtbot.wait(50)
             # Warning should NOT have been called since document is not modified
             mock_warning.assert_not_called()
+
+
+class TestSplitButtonTooltipOnClick:
+    """Tests for split button tooltip visibility on click when disabled."""
+    
+    def test_tooltip_stays_visible_after_click_release(self, qtbot):
+        """Test that tooltip stays visible after mouse press and release on disabled split button."""
+        from PySide6.QtCore import QEvent
+        from PySide6.QtGui import QMouseEvent
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create splits until max is reached
+        for i in range(window.MAX_SPLIT_PANES - 1):
+            window.create_split_pane()
+        
+        # Verify button is disabled
+        split_button = window.tab_widget.split_button
+        assert not split_button.isEnabled()
+        
+        # Get button center position
+        button_center = split_button.rect().center()
+        global_pos = split_button.mapToGlobal(button_center)
+        
+        # Custom tooltip should be hidden initially
+        custom_tooltip = window.tab_widget._custom_tooltip
+        assert not custom_tooltip.isVisible(), "Custom tooltip should be hidden initially"
+        
+        # Simulate mouse press
+        press_event = QMouseEvent(
+            QEvent.Type.MouseButtonPress,
+            QPoint(button_center),
+            global_pos,
+            Qt.LeftButton,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        window.tab_widget.eventFilter(split_button, press_event)
+        qtbot.wait(50)
+        
+        # Verify tooltip is visible after press
+        assert custom_tooltip.isVisible(), "Custom tooltip should be visible after mouse press"
+        
+        # Simulate mouse release
+        release_event = QMouseEvent(
+            QEvent.Type.MouseButtonRelease,
+            QPoint(button_center),
+            global_pos,
+            Qt.LeftButton,
+            Qt.NoButton,
+            Qt.NoModifier
+        )
+        window.tab_widget.eventFilter(split_button, release_event)
+        qtbot.wait(50)
+        
+        # Tooltip should STILL be visible after release
+        assert custom_tooltip.isVisible(), "Custom tooltip should still be visible after mouse release"
+        
+        # Simulate mouse leave
+        leave_event = QEvent(QEvent.Type.Leave)
+        window.tab_widget.eventFilter(split_button, leave_event)
+        qtbot.wait(50)
+        
+        # Tooltip should be hidden after leave
+        assert not custom_tooltip.isVisible(), "Custom tooltip should be hidden after mouse leave"
