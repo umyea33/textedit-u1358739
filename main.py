@@ -1178,9 +1178,10 @@ class TextEditor(QMainWindow):
         for i in range(tab_widget.count()):
             editor = tab_widget.widget(i)
             if editor and editor.document().isModified():
+                file_name = tab_widget.tabText(i)
                 ret = QMessageBox.warning(
                     self, "TextEdit",
-                    "The document has been modified.\nDo you want to save your changes?",
+                    f"The file '{file_name}' has been modified.\nDo you want to save your changes?",
                     QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
                 )
                 if ret == QMessageBox.Save:
@@ -1372,9 +1373,10 @@ class TextEditor(QMainWindow):
         """Close a tab, with unsaved changes warning."""
         editor = self.tab_widget.widget(index)
         if editor.document().isModified():
+            file_name = self.tab_widget.tabText(index)
             ret = QMessageBox.warning(
                 self, "TextEdit",
-                "The document has been modified.\nDo you want to save your changes?",
+                f"The file '{file_name}' has been modified.\nDo you want to save your changes?",
                 QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
             )
             if ret == QMessageBox.Save:
@@ -1771,9 +1773,10 @@ class TextEditor(QMainWindow):
     
     def maybe_save(self):
         if self.editor.document().isModified():
+            file_name = self.tab_widget.tabText(self.tab_widget.currentIndex())
             ret = QMessageBox.warning(
                 self, "TextEdit",
-                "The document has been modified.\nDo you want to save your changes?",
+                f"The file '{file_name}' has been modified.\nDo you want to save your changes?",
                 QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
             )
             if ret == QMessageBox.Save:
@@ -1983,9 +1986,10 @@ class TextEditor(QMainWindow):
                     # Switch to this pane to show the user which file has unsaved changes
                     self.set_active_pane(pane)
                     pane.tab_widget.setCurrentIndex(i)
+                    file_name = pane.tab_widget.tabText(i)
                     ret = QMessageBox.warning(
                         self, "TextEdit",
-                        "The document has been modified.\nDo you want to save your changes?",
+                        f"The file '{file_name}' has been modified.\nDo you want to save your changes?",
                         QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
                     )
                     if ret == QMessageBox.Save:
