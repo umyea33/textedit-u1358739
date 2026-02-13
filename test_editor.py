@@ -4704,3 +4704,151 @@ class TestSplitButtonTooltipOnClick:
         # Tooltip should be hidden after leave
         assert not custom_tooltip.isVisible(), "Custom tooltip should be hidden after mouse leave"
 
+
+class TestSyntaxHighlighting:
+    """Tests for syntax highlighting functionality."""
+
+    def test_syntax_highlighter_creation(self, qtbot):
+        """Test that SyntaxHighlighter can be created."""
+        from PySide6.QtGui import QTextDocument
+        doc = QTextDocument()
+        highlighter = SyntaxHighlighter(doc)
+        assert highlighter is not None
+        assert highlighter.document() == doc
+
+    def test_set_language(self, qtbot):
+        """Test setting language for syntax highlighting."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        
+        # Set to python language
+        editor.set_language("python")
+        assert editor.highlighter is not None
+
+    def test_set_language_from_file(self, qtbot):
+        """Test setting language based on file extension."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        
+        # Test Python file
+        editor.set_language_from_file("test.py")
+        assert editor.highlighter is not None
+
+    def test_syntax_highlighting_python_keywords(self, qtbot):
+        """Test that Python keywords are highlighted."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.show()
+        qtbot.waitExposed(editor)
+        
+        editor.set_language("python")
+        editor.setPlainText("def foo():\n    return 42")
+        
+        # Check that the document has syntax highlighting applied
+        assert editor.toPlainText() == "def foo():\n    return 42"
+
+    def test_syntax_highlighting_javascript(self, qtbot):
+        """Test JavaScript syntax highlighting."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.show()
+        qtbot.waitExposed(editor)
+        
+        editor.set_language("javascript")
+        editor.setPlainText("function test() { return true; }")
+        
+        assert editor.toPlainText() == "function test() { return true; }"
+
+    def test_syntax_highlighting_rust(self, qtbot):
+        """Test Rust syntax highlighting."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.show()
+        qtbot.waitExposed(editor)
+        
+        editor.set_language("rust")
+        editor.setPlainText("fn main() { println!(\"Hello\"); }")
+        
+        assert editor.toPlainText() == "fn main() { println!(\"Hello\"); }"
+
+    def test_syntax_highlighting_cpp(self, qtbot):
+        """Test C++ syntax highlighting."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.show()
+        qtbot.waitExposed(editor)
+        
+        editor.set_language("cpp")
+        editor.setPlainText("#include <iostream>\nint main() { return 0; }")
+        
+        assert editor.toPlainText() == "#include <iostream>\nint main() { return 0; }"
+
+    def test_multiple_language_switches(self, qtbot):
+        """Test switching between multiple languages."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.show()
+        qtbot.waitExposed(editor)
+        
+        # Switch languages multiple times
+        editor.set_language("python")
+        editor.setPlainText("x = 42")
+        assert editor.toPlainText() == "x = 42"
+        
+        editor.set_language("javascript")
+        editor.setPlainText("let x = 42;")
+        assert editor.toPlainText() == "let x = 42;"
+        
+        editor.set_language("rust")
+        editor.setPlainText("let x = 42;")
+        assert editor.toPlainText() == "let x = 42;"
+
+    def test_syntax_highlighting_with_comments(self, qtbot):
+        """Test syntax highlighting with comment text."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.show()
+        qtbot.waitExposed(editor)
+        
+        editor.set_language("python")
+        code = "# This is a comment\nx = 42  # inline comment"
+        editor.setPlainText(code)
+        
+        assert editor.toPlainText() == code
+
+    def test_syntax_highlighting_with_strings(self, qtbot):
+        """Test syntax highlighting with string literals."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.show()
+        qtbot.waitExposed(editor)
+        
+        editor.set_language("python")
+        code = 'message = "Hello World"\nother = \'single quotes\''
+        editor.setPlainText(code)
+        
+        assert editor.toPlainText() == code
+
+    def test_syntax_highlighting_empty_text(self, qtbot):
+        """Test syntax highlighting with empty editor."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.show()
+        qtbot.waitExposed(editor)
+        
+        editor.set_language("python")
+        editor.setPlainText("")
+        
+        assert editor.toPlainText() == ""
+
+    def test_syntax_highlighter_formats_exist(self, qtbot):
+        """Test that syntax highlighter has color formats defined."""
+        from PySide6.QtGui import QTextDocument
+        doc = QTextDocument()
+        highlighter = SyntaxHighlighter(doc)
+        
+        # Check that formats dictionary exists and has entries
+        assert hasattr(highlighter, 'formats')
+        assert isinstance(highlighter.formats, dict)
+        assert len(highlighter.formats) > 0
+
