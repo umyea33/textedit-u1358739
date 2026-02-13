@@ -5,8 +5,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QFileDialog, QMessageBox, QStatusBar, QMenuBar,
     QToolBar, QLabel, QLineEdit, QDialog, QPushButton, QSplitter,
     QTreeView, QFileSystemModel, QFrame, QTextEdit, QInputDialog, QMenu,
-    QTabWidget, QTabBar, QStyle, QScrollArea, QToolTip, QFontComboBox,
-    QSpinBox, QColorDialog
+    QTabWidget, QTabBar, QStyle, QScrollArea, QToolTip
 )
 from PySide6.QtGui import (
     QAction, QKeySequence, QFont, QColor, QPainter, QTextFormat,
@@ -835,7 +834,6 @@ class CodeEditor(QPlainTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.line_number_area = LineNumberArea(self)
-        self._text_color = QColor("#d4d4d4")  # Default text color
         
         # Setup syntax highlighter
         self.highlighter = SyntaxHighlighter(self.document())
@@ -964,110 +962,6 @@ class CodeEditor(QPlainTextEdit):
             bottom = top + round(self.blockBoundingRect(block).height())
             block_number += 1
 
-
-class FontSelectionDialog(QDialog):
-    """Dialog for selecting a font with live preview."""
-    
-    def __init__(self, current_font, parent=None):
-        super().__init__(parent)
-        self.selected_font = current_font.family()
-        self.setWindowTitle("Select Font")
-        self.setFixedSize(400, 350)
-        self.setup_ui(current_font)
-        self.apply_dark_theme()
-    
-    def setup_ui(self, current_font):
-        layout = QVBoxLayout(self)
-        
-        # Font list
-        layout.addWidget(QLabel("Select a font:"))
-        
-        self.fonts = ["Consolas", "Courier New", "Lucida Console", "Monaco", "Menlo", 
-                      "DejaVu Sans Mono", "Source Code Pro", "Fira Code", "JetBrains Mono",
-                      "Arial", "Times New Roman", "Verdana", "Georgia", "Trebuchet MS"]
-        
-        from PySide6.QtWidgets import QListWidget
-        self.font_list = QListWidget()
-        self.font_list.setMinimumHeight(150)
-        
-        current_index = 0
-        for i, font_name in enumerate(self.fonts):
-            self.font_list.addItem(font_name)
-            item = self.font_list.item(i)
-            item.setFont(QFont(font_name, 11))
-            if font_name.lower() == current_font.family().lower():
-                current_index = i
-        
-        self.font_list.setCurrentRow(current_index)
-        self.font_list.currentRowChanged.connect(self.update_preview)
-        layout.addWidget(self.font_list)
-        
-        # Preview
-        layout.addWidget(QLabel("Preview:"))
-        self.preview_label = QLabel("The quick brown fox jumps over the lazy dog.\n0123456789 !@#$%^&*()")
-        self.preview_label.setMinimumHeight(60)
-        self.preview_label.setStyleSheet("""
-            QLabel {
-                background-color: #1e1e1e;
-                color: #d4d4d4;
-                padding: 10px;
-                border: 1px solid #454545;
-            }
-        """)
-        self.preview_label.setFont(QFont(current_font.family(), 12))
-        layout.addWidget(self.preview_label)
-        
-        # Buttons
-        button_layout = QHBoxLayout()
-        ok_btn = QPushButton("OK")
-        ok_btn.clicked.connect(self.accept)
-        cancel_btn = QPushButton("Cancel")
-        cancel_btn.clicked.connect(self.reject)
-        button_layout.addStretch()
-        button_layout.addWidget(ok_btn)
-        button_layout.addWidget(cancel_btn)
-        layout.addLayout(button_layout)
-    
-    def update_preview(self, row):
-        if row >= 0 and row < len(self.fonts):
-            font_name = self.fonts[row]
-            self.selected_font = font_name
-            self.preview_label.setFont(QFont(font_name, 12))
-    
-    def get_selected_font(self):
-        return self.selected_font
-    
-    def apply_dark_theme(self):
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #252526;
-                color: #cccccc;
-            }
-            QLabel {
-                color: #cccccc;
-            }
-            QListWidget {
-                background-color: #1e1e1e;
-                color: #d4d4d4;
-                border: 1px solid #454545;
-            }
-            QListWidget::item:selected {
-                background-color: #094771;
-            }
-            QListWidget::item:hover {
-                background-color: #2a2d2e;
-            }
-            QPushButton {
-                background-color: #0e639c;
-                color: white;
-                border: none;
-                padding: 5px 15px;
-                min-width: 70px;
-            }
-            QPushButton:hover {
-                background-color: #1177bb;
-            }
-        """)
 
 
 class FindReplaceDialog(QDialog):
@@ -1968,21 +1862,6 @@ class TextEditor(QMainWindow):
         # Language submenu
         self.language_menu = view_menu.addMenu("&Language")
         self._setup_language_menu()
-        
-        # Format menu
-        format_menu = menubar.addMenu("F&ormat")
-        
-        font_action = QAction("&Font...", self)
-        font_action.triggered.connect(self.show_font_dialog)
-        format_menu.addAction(font_action)
-        
-        font_size_action = QAction("Font &Size...", self)
-        font_size_action.triggered.connect(self.show_font_size_dialog)
-        format_menu.addAction(font_size_action)
-        
-        font_color_action = QAction("Font &Color...", self)
-        font_color_action.triggered.connect(self.show_font_color_dialog)
-        format_menu.addAction(font_color_action)
         
         # Help menu
         help_menu = menubar.addMenu("&Help")
@@ -3277,68 +3156,7 @@ class TextEditor(QMainWindow):
         zoom_percent = int((font.pointSize() / 11) * 100)
         self.zoom_indicator.setText(f"{zoom_percent}%")
     
-    def show_font_dialog(self):
-        """Show font selection dialog with preview."""
-        current_font = self.editor.font()
-        dialog = FontSelectionDialog(current_font, self)
-        if dialog.exec() == QDialog.Accepted:
-            font_name = dialog.get_selected_font()
-            self.set_editor_font_family(font_name)
-    
-    def set_editor_font_family(self, font_family):
-        """Set font family for all editors in all panes."""
-        for pane in self.split_panes:
-            for i in range(pane.tab_widget.count()):
-                editor = pane.tab_widget.widget(i)
-                if isinstance(editor, CodeEditor):
-                    current_font = editor.font()
-                    current_font.setFamily(font_family)
-                    editor.setFont(current_font)
-                    editor.line_number_area.setFont(current_font)
-                    metrics = QFontMetrics(current_font)
-                    editor.setTabStopDistance(4 * metrics.horizontalAdvance(' '))
-    
-    def show_font_size_dialog(self):
-        """Show font size selection dialog."""
-        current_font = self.editor.font()
-        current_size = current_font.pointSize()
-        
-        size, ok = QInputDialog.getInt(
-            self, "Select Font Size", "Size (pt):", current_size, 6, 72, 1
-        )
-        if ok:
-            self.set_editor_font_size(size)
-    
-    def set_editor_font_size(self, size):
-        """Set font size for all editors in all panes."""
-        for pane in self.split_panes:
-            for i in range(pane.tab_widget.count()):
-                editor = pane.tab_widget.widget(i)
-                if isinstance(editor, CodeEditor):
-                    current_font = editor.font()
-                    current_font.setPointSize(size)
-                    editor.setFont(current_font)
-                    editor.line_number_area.setFont(current_font)
-                    metrics = QFontMetrics(current_font)
-                    editor.setTabStopDistance(4 * metrics.horizontalAdvance(' '))
-        self.update_zoom_indicator()
-        self.show_zoom_indicator()
-    
-    def show_font_color_dialog(self):
-        """Show font color selection dialog."""
-        current_color = self.editor.get_text_color()
-        color = QColorDialog.getColor(current_color, self, "Select Font Color")
-        if color.isValid():
-            self.set_editor_font_color(color)
-    
-    def set_editor_font_color(self, color):
-        """Set font color for all editors in all panes."""
-        for pane in self.split_panes:
-            for i in range(pane.tab_widget.count()):
-                editor = pane.tab_widget.widget(i)
-                if isinstance(editor, CodeEditor):
-                    editor.set_text_color(color)
-    
+
     def show_about(self):
         QMessageBox.about(
             self, "About TextEdit",
