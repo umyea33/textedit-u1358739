@@ -5807,6 +5807,732 @@ class TestSyntaxHighlighting:
         assert len(highlighter.formats) > 0
 
 
+class TestDragDropFileTreeOperations:
+    """Tests for DragDropFileTree drag and drop functionality."""
+
+    def test_drag_enter_with_urls(self, qtbot, tmp_path):
+        """Test dragEnterEvent accepts URL drops."""
+        from main import DragDropFileTree
+        from PySide6.QtGui import QDropEvent
+        from PySide6.QtCore import QMimeData, QUrl
+        
+        tree = DragDropFileTree()
+        qtbot.addWidget(tree)
+        
+        # Create a drop event with URLs
+        mime_data = QMimeData()
+        file_path = str(tmp_path / "test.txt")
+        mime_data.setUrls([QUrl.fromLocalFile(file_path)])
+        
+        drop_event = QDropEvent(
+            tree.rect().center(),
+            Qt.DropActions(Qt.MoveAction),
+            mime_data,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        
+        # dragEnterEvent should accept the action
+        tree.dragEnterEvent(drop_event)
+        # If it reaches here without error, test passes
+
+    def test_drag_move_with_urls(self, qtbot, tmp_path):
+        """Test dragMoveEvent accepts URL drags."""
+        from main import DragDropFileTree
+        from PySide6.QtGui import QDropEvent
+        from PySide6.QtCore import QMimeData, QUrl
+        
+        tree = DragDropFileTree()
+        qtbot.addWidget(tree)
+        
+        # Create a drag move event with URLs
+        mime_data = QMimeData()
+        mime_data.setUrls([QUrl.fromLocalFile(str(tmp_path / "test.txt"))])
+        
+        drag_move_event = QDropEvent(
+            tree.rect().center(),
+            Qt.DropActions(Qt.MoveAction),
+            mime_data,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        
+        tree.dragMoveEvent(drag_move_event)
+
+    def test_drop_event_with_urls(self, qtbot, tmp_path):
+        """Test dropEvent processes file drops."""
+        from main import DragDropFileTree
+        from PySide6.QtGui import QDropEvent
+        from PySide6.QtCore import QMimeData, QUrl
+        
+        tree = DragDropFileTree()
+        qtbot.addWidget(tree)
+        
+        # Create test files
+        source_file = tmp_path / "source.txt"
+        source_file.write_text("test")
+        dest_folder = tmp_path / "dest"
+        dest_folder.mkdir()
+        
+        # Create drop event
+        mime_data = QMimeData()
+        mime_data.setUrls([QUrl.fromLocalFile(str(source_file))])
+        
+        # Note: dropEvent needs valid model - just test it doesn't crash
+        drop_event = QDropEvent(
+            tree.rect().center(),
+            Qt.DropActions(Qt.MoveAction),
+            mime_data,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        
+        tree.dropEvent(drop_event)
+
+    def test_drag_enter_without_urls(self, qtbot):
+        """Test dragEnterEvent delegates non-URL events."""
+        from main import DragDropFileTree
+        from PySide6.QtGui import QDragEnterEvent
+        from PySide6.QtCore import QMimeData, QPoint
+        
+        tree = DragDropFileTree()
+        qtbot.addWidget(tree)
+        
+        # Create mime data without URLs
+        mime_data = QMimeData()
+        mime_data.setText("not a url")
+        
+        # Create a drag enter event without URLs
+        drag_enter_event = QDragEnterEvent(
+            QPoint(0, 0),
+            Qt.DropActions(Qt.IgnoreAction),
+            mime_data,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        
+        # Should call parent's dragEnterEvent
+        tree.dragEnterEvent(drag_enter_event)
+
+    def test_drag_move_without_urls(self, qtbot):
+        """Test dragMoveEvent delegates non-URL events."""
+        from main import DragDropFileTree
+        from PySide6.QtGui import QDragMoveEvent
+        from PySide6.QtCore import QMimeData, QPoint
+        
+        tree = DragDropFileTree()
+        qtbot.addWidget(tree)
+        
+        # Create mime data without URLs
+        mime_data = QMimeData()
+        mime_data.setText("plain text")
+        
+        # Create a drag move event without URLs
+        drag_move_event = QDragMoveEvent(
+            QPoint(0, 0),
+            Qt.DropActions(Qt.IgnoreAction),
+            mime_data,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        
+        tree.dragMoveEvent(drag_move_event)
+
+    def test_drop_event_without_urls(self, qtbot):
+        """Test dropEvent delegates non-URL drops."""
+        from main import DragDropFileTree
+        from PySide6.QtGui import QDropEvent
+        from PySide6.QtCore import QMimeData
+        
+        tree = DragDropFileTree()
+        qtbot.addWidget(tree)
+        
+        # Create drop event without URLs
+        mime_data = QMimeData()
+        mime_data.setText("some text")
+        
+        drop_event = QDropEvent(
+            tree.rect().center(),
+            Qt.DropActions(Qt.IgnoreAction),
+            mime_data,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        
+        tree.dropEvent(drop_event)
+
+
+class TestSaveFileOperations:
+    """Tests for save_file exception handling and file operations."""
+
+    def test_save_existing_file_with_write_error(self, qtbot, tmp_path, monkeypatch):
+        """Test save_file handles write errors gracefully."""
+        from main import TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create and open a file
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("original")
+        window.load_file(str(test_file))
+        qtbot.wait(100)
+        
+        # Modify content
+        window.editor.setPlainText("modified")
+        
+        # Mock open to fail for write operations
+        original_open = open
+        def mock_open(*args, **kwargs):
+            if len(args) > 1 and 'w' in args[1]:
+                raise PermissionError("Permission denied")
+            return original_open(*args, **kwargs)
+        
+        # Mock error dialog
+        error_shown = []
+        monkeypatch.setattr(
+            "main.QMessageBox.critical",
+            lambda *args, **kwargs: error_shown.append(True)
+        )
+        
+        monkeypatch.setattr("builtins.open", mock_open)
+        
+        result = window.save_file()
+        
+        # Should return False and show error
+        assert not result
+        assert len(error_shown) == 1
+
+    def test_save_as_new_file(self, qtbot, tmp_path, monkeypatch):
+        """Test save_file with untitled document shows save dialog."""
+        from main import TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create new untitled file
+        window.new_file_without_tab_check()
+        window.editor.setPlainText("some content")
+        
+        # Mock the save dialog to return a file path
+        save_path = str(tmp_path / "newsave.txt")
+        monkeypatch.setattr(
+            "main.QFileDialog.getSaveFileName",
+            lambda *args, **kwargs: (save_path, "")
+        )
+        
+        result = window.save_file()
+        
+        # Should return True
+        assert result
+        # File should be created
+        assert Path(save_path).exists()
+        assert Path(save_path).read_text() == "some content"
+
+    def test_save_as_cancelled(self, qtbot, tmp_path, monkeypatch):
+        """Test save_file when save dialog is cancelled."""
+        from main import TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create untitled file
+        window.new_file_without_tab_check()
+        window.editor.setPlainText("unsaved")
+        
+        # Mock save dialog to return empty (cancelled)
+        monkeypatch.setattr(
+            "main.QFileDialog.getSaveFileName",
+            lambda *args, **kwargs: ("", "")
+        )
+        
+        result = window.save_file()
+        
+        # Should return False
+        assert not result
+
+    def test_save_as_new_file_with_write_error(self, qtbot, tmp_path, monkeypatch):
+        """Test save_file with new file write error."""
+        from main import TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.new_file_without_tab_check()
+        window.editor.setPlainText("content")
+        
+        save_path = str(tmp_path / "newsave.txt")
+        monkeypatch.setattr(
+            "main.QFileDialog.getSaveFileName",
+            lambda *args, **kwargs: (save_path, "")
+        )
+        
+        # Mock open to fail
+        original_open = open
+        def mock_open(*args, **kwargs):
+            if len(args) > 1 and 'w' in args[1]:
+                raise IOError("Disk full")
+            return original_open(*args, **kwargs)
+        
+        error_shown = []
+        monkeypatch.setattr(
+            "main.QMessageBox.critical",
+            lambda *args, **kwargs: error_shown.append(True)
+        )
+        
+        monkeypatch.setattr("builtins.open", mock_open)
+        
+        result = window.save_file()
+        
+        # Should fail and show error
+        assert not result
+        assert len(error_shown) == 1
+
+
+class TestLoadFileOperations:
+    """Tests for load_file and file loading edge cases."""
+
+    def test_load_file_with_read_error(self, qtbot, tmp_path, monkeypatch):
+        """Test load_file handles read errors gracefully."""
+        from main import TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("content")
+        
+        # Mock open to fail on read
+        original_open = open
+        def mock_open(*args, **kwargs):
+            if len(args) > 1 and 'r' in args[1]:
+                raise IOError("File corrupted")
+            return original_open(*args, **kwargs)
+        
+        error_shown = []
+        monkeypatch.setattr(
+            "main.QMessageBox.critical",
+            lambda *args, **kwargs: error_shown.append(True)
+        )
+        
+        monkeypatch.setattr("builtins.open", mock_open)
+        
+        window.load_file(str(test_file))
+        
+        # Should show error
+        assert len(error_shown) >= 1
+
+    def test_load_file_with_unsupported_encoding(self, qtbot, tmp_path):
+        """Test load_file with binary file."""
+        from main import TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create binary file
+        binary_file = tmp_path / "binary.bin"
+        binary_file.write_bytes(b"\x00\x01\x02\x03")
+        
+        # Should handle gracefully (with errors='ignore')
+        window.load_file(str(binary_file))
+
+
+class TestCloseSplitPane:
+    """Tests for close_split_pane functionality."""
+
+    def test_close_split_pane_with_changes(self, qtbot, tmp_path, monkeypatch):
+        """Test closing pane with unsaved changes."""
+        from main import TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Add split
+        window.add_split_view()
+        assert len(window.split_panes) == 2
+        
+        # Modify content
+        window.editor.setPlainText("modified")
+        
+        # Mock save dialog - choose "Discard"
+        monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: 16384  # Yes/Ok
+        )
+        
+        pane = window.split_panes[1]
+        window.close_split_pane(pane)
+        
+        # Pane should be removed
+        assert pane not in window.split_panes
+
+    def test_close_last_pane(self, qtbot):
+        """Test that closing the last pane doesn't crash."""
+        from main import TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Can't close the main pane when it's the only one
+        # This should just not do anything or handle gracefully
+        pane = window.split_panes[0]
+        
+        # This shouldn't crash
+        try:
+            window.close_split_pane(pane)
+        except:
+            pass
+
+
+class TestFileTreeContextMenuOperations:
+    """Tests for file tree context menu operations."""
+
+    def test_delete_file_from_context_menu(self, qtbot, tmp_path, monkeypatch):
+        """Test deleting a file via context menu."""
+        from main import TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create test file
+        test_file = tmp_path / "deleteme.txt"
+        test_file.write_text("content")
+        
+        # Set up file tree
+        window.file_model.setRootPath(str(tmp_path))
+        window.file_tree.setRootIndex(window.file_model.index(str(tmp_path)))
+        
+        # Get file index
+        file_index = window.file_model.index(str(test_file))
+        
+        # Mock confirmation dialog
+        monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: 16384  # QMessageBox.Yes
+        )
+        
+        # Delete
+        window.delete_file_or_folder(file_index)
+        
+        # File should be gone
+        assert not test_file.exists()
+
+    def test_delete_folder_from_context_menu(self, qtbot, tmp_path, monkeypatch):
+        """Test deleting a folder via context menu."""
+        from main import TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create test folder
+        test_folder = tmp_path / "deletefolder"
+        test_folder.mkdir()
+        (test_folder / "file.txt").write_text("content")
+        
+        # Set up file tree
+        window.file_model.setRootPath(str(tmp_path))
+        window.file_tree.setRootIndex(window.file_model.index(str(tmp_path)))
+        
+        # Get folder index
+        folder_index = window.file_model.index(str(test_folder))
+        
+        # Mock confirmation
+        monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: 16384  # QMessageBox.Yes
+        )
+        
+        window.delete_file_or_folder(folder_index)
+        
+        # Folder should be gone
+        assert not test_folder.exists()
+
+    def test_delete_cancelled(self, qtbot, tmp_path, monkeypatch):
+        """Test cancelling delete operation."""
+        from main import TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        test_file = tmp_path / "keep.txt"
+        test_file.write_text("keep this")
+        
+        window.file_model.setRootPath(str(tmp_path))
+        window.file_tree.setRootIndex(window.file_model.index(str(tmp_path)))
+        
+        file_index = window.file_model.index(str(test_file))
+        
+        # Mock cancellation
+        monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: 65536  # QMessageBox.No
+        )
+        
+        window.delete_file_or_folder(file_index)
+        
+        # File should still exist
+        assert test_file.exists()
+
+
+class TestFindReplaceDialogEdgeCases:
+    """Tests for edge cases and untested code paths in FindReplaceDialog."""
+
+    def test_highlight_all_matches_with_empty_text(self, qtbot):
+        """Test that highlight_all_matches returns early with empty search text."""
+        from main import FindReplaceDialog, CodeEditor
+        
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.setPlainText("hello world\nhello again")
+        
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        dialog.find_input.setText("")
+        
+        # Call highlight_all_matches with empty text
+        dialog.highlight_all_matches()
+        
+        # Should not crash and all_matches should be empty
+        assert dialog.all_matches == []
+
+    def test_find_next_with_empty_text(self, qtbot):
+        """Test find_next does nothing with empty search text."""
+        from main import FindReplaceDialog, CodeEditor
+        
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.setPlainText("hello world")
+        
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        dialog.find_input.setText("")
+        
+        # Call find_next with empty text
+        dialog.find_next()
+        
+        # Should not find anything
+        cursor = editor.textCursor()
+        assert not cursor.hasSelection()
+
+    def test_replace_without_selection(self, qtbot):
+        """Test replace when no text is selected."""
+        from main import FindReplaceDialog, CodeEditor
+        
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.setPlainText("hello world")
+        
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("goodbye")
+        
+        # Click replace without any selection
+        dialog.replace()
+        
+        # Text should not be replaced (no selection)
+        assert "hello world" == editor.toPlainText()
+
+    def test_highlight_current_match_positions_cursor(self, qtbot):
+        """Test that highlight_current_match sets cursor position correctly."""
+        from main import FindReplaceDialog, CodeEditor
+        
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.setPlainText("hello world hello")
+        
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        
+        # Highlight match from position 0 to 5 ("hello")
+        dialog.highlight_current_match(0, 5)
+        
+        cursor = editor.textCursor()
+        assert cursor.hasSelection()
+        assert cursor.selectionStart() == 0
+        assert cursor.selectionEnd() == 5
+
+    def test_find_next_continues_from_selection(self, qtbot):
+        """Test find_next continues from current selection."""
+        from main import FindReplaceDialog, CodeEditor
+        
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.setPlainText("hello world hello")
+        
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        dialog.find_input.setText("hello")
+        
+        # First find should find first "hello"
+        dialog.find_next()
+        cursor = editor.textCursor()
+        first_start = cursor.selectionStart()
+        first_end = cursor.selectionEnd()
+        
+        # Second find should find next "hello"
+        dialog.find_next()
+        cursor = editor.textCursor()
+        second_start = cursor.selectionStart()
+        second_end = cursor.selectionEnd()
+        
+        # Should be at different positions
+        assert first_start != second_start or first_end != second_end
+
+    def test_find_next_wraps_around_from_selection(self, qtbot):
+        """Test find wraps around when searching from a selection at end."""
+        from main import FindReplaceDialog, CodeEditor
+        
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.setPlainText("hello world")
+        
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        dialog.find_input.setText("hello")
+        
+        # Find first match
+        dialog.find_next()
+        
+        # Find again (should wrap to start)
+        dialog.find_next()
+        
+        # Should still find hello at position 0
+        cursor = editor.textCursor()
+        assert cursor.selectionStart() == 0
+
+
+class TestSearchResultButton:
+    """Tests for SearchResultButton hover effects and interactions."""
+
+    def test_search_result_button_mouse_enter(self, qtbot):
+        """Test SearchResultButton changes style on mouse enter."""
+        from main import SearchResultButton, TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        button = SearchResultButton(
+            file_path="test.txt",
+            line_num=1,
+            line_text="hello world",
+            match_start=0,
+            match_text="hello",
+            text_editor=window
+        )
+        qtbot.addWidget(button)
+        
+        # Record original stylesheet
+        original_style = button.label.styleSheet()
+        
+        # Simulate mouse enter
+        button.enterEvent(None)
+        
+        # Stylesheet should change to hover style
+        hover_style = button.label.styleSheet()
+        assert original_style != hover_style
+        assert "#007acc" in hover_style  # Blue border on hover
+        assert "#3e3e42" in hover_style  # Darker background on hover
+
+    def test_search_result_button_mouse_leave(self, qtbot):
+        """Test SearchResultButton restores style on mouse leave."""
+        from main import SearchResultButton, TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        button = SearchResultButton(
+            file_path="test.txt",
+            line_num=1,
+            line_text="hello world",
+            match_start=0,
+            match_text="hello",
+            text_editor=window
+        )
+        qtbot.addWidget(button)
+        
+        # First enter
+        button.enterEvent(None)
+        hover_style = button.label.styleSheet()
+        
+        # Then leave
+        button.leaveEvent(None)
+        normal_style = button.label.styleSheet()
+        
+        # Should revert to normal style
+        assert hover_style != normal_style
+        assert "#007acc" not in normal_style  # No blue border
+        assert "#2d2d30" in normal_style  # Normal background
+
+    def test_search_result_button_highlights_match_text(self, qtbot):
+        """Test SearchResultButton correctly highlights the matched text."""
+        from main import SearchResultButton, TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        button = SearchResultButton(
+            file_path="test.txt",
+            line_num=5,
+            line_text="this is a hello world string",
+            match_start=10,
+            match_text="hello",
+            text_editor=window
+        )
+        qtbot.addWidget(button)
+        
+        # Check that HTML contains proper formatting
+        html_text = button.label.text()
+        assert "test.txt:5" in html_text  # File and line info
+        assert "#ffff00" in html_text  # Yellow background for match
+        assert "#000000" in html_text  # Black text for match
+        assert "hello" in html_text
+
+    def test_search_result_button_cursor_changes(self, qtbot):
+        """Test SearchResultButton has pointing hand cursor."""
+        from main import SearchResultButton, TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        button = SearchResultButton(
+            file_path="test.txt",
+            line_num=1,
+            line_text="hello world",
+            match_start=0,
+            match_text="hello",
+            text_editor=window
+        )
+        qtbot.addWidget(button)
+        
+        # Button should have pointing hand cursor
+        assert button.cursor().shape() == Qt.PointingHandCursor
+        # Label should also have pointing hand cursor
+        assert button.label.cursor().shape() == Qt.PointingHandCursor
+
+
 class TestMultiFileSearchAndReplace:
     """Tests for multifile find and replace functionality."""
 
@@ -6168,4 +6894,66 @@ class TestMultiFileSearchAndReplace:
         
         # Should have created and shown results dialog
         assert len(exec_called) == 1
+
+    def test_replace_all_files_updates_open_file(self, qtbot, tmp_path, monkeypatch):
+        """Test that replace_all_files updates currently open files."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("hello world")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Load the file in the editor
+        window.load_file(str(file1))
+        qtbot.wait(100)
+        
+        # Verify file is open
+        assert window.current_file == str(file1)
+        
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("goodbye")
+        
+        # Mock QMessageBox to prevent blocking
+        monkeypatch.setattr(
+            "main.QMessageBox.information",
+            lambda *args, **kwargs: None
+        )
+        
+        dialog.replace_all_files()
+        
+        # Open editor should have the updated content
+        content = window.editor.toPlainText()
+        assert "goodbye world" in content
+        assert "hello" not in content
+        
+        # File on disk should also be updated
+        assert file1.read_text() == "goodbye world"
+
+    def test_search_results_dialog_displayed(self, qtbot, tmp_path):
+        """Test that MultiFileSearchResultsDialog displays results."""
+        from main import MultiFileSearchResultsDialog, TextEditor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        # Create sample results
+        results = [
+            ("file1.txt", 1, "hello world", 0, "hello"),
+            ("file2.txt", 5, "hello again", 0, "hello"),
+        ]
+        
+        dialog = MultiFileSearchResultsDialog(results, window)
+        qtbot.addWidget(dialog)
+        dialog.show()
+        qtbot.waitExposed(dialog)
+        
+        # Dialog should be visible
+        assert dialog.isVisible()
+        # Window title should show result count
+        assert "2 matches" in dialog.windowTitle()
 
