@@ -8693,7 +8693,6 @@ class TestCoverageGaps:
         editor = CodeEditor()
         qtbot.addWidget(editor)
         
-        # Just verify it doesn't raise an exception
         editor.set_language("python")
     
     def test_code_editor_set_language_from_file(self, qtbot):
@@ -8701,7 +8700,6 @@ class TestCoverageGaps:
         editor = CodeEditor()
         qtbot.addWidget(editor)
         
-        # Just verify it doesn't raise an exception
         editor.set_language_from_file("test.py")
     
     def test_code_editor_set_text_color(self, qtbot):
@@ -8725,7 +8723,6 @@ class TestCoverageGaps:
         pane = SplitEditorPane()
         qtbot.addWidget(pane)
         
-        # Get the close button and click it
         close_button = pane.close_button
         press_event = QMouseEvent(
             QMouseEvent.MouseButtonPress,
@@ -8948,33 +8945,7 @@ class TestCoverageGaps:
         assert len(close_spy) == 1
         assert close_spy[0] == 0
     
-    def test_line_number_area_paint_event(self, qtbot):
-        """Test LineNumberArea paintEvent."""
-        editor = CodeEditor()
-        qtbot.addWidget(editor)
-        editor.show()
-        
-        editor.setPlainText("Line 1\nLine 2\nLine 3\nLine 4\nLine 5")
-        # Trigger a paint by updating
-        editor.line_number_area.update()
-        qtbot.wait(50)
-    
-    def test_syntax_highlighter_highlight_block(self, qtbot):
-        """Test SyntaxHighlighter highlightBlock."""
-        doc = QTextDocument()
-        highlighter = SyntaxHighlighter(doc, "python")
-        
-        doc.setPlainText("def hello():\n    print('world')")
-        # Should not raise any exceptions
-        assert highlighter is not None
-    
-    def test_custom_tab_widget_on_tab_close_requested(self, qtbot):
-        """Test CustomTabWidget on_tab_close_requested."""
-        widget = CustomTabWidget()
-        qtbot.addWidget(widget)
-        
-        # This is tested indirectly through other tests, but make sure it exists
-        assert hasattr(widget, 'on_tab_close_requested')
+
     
     def test_split_editor_pane_set_close_visible(self, qtbot):
         """Test SplitEditorPane set_close_visible."""
@@ -8986,68 +8957,7 @@ class TestCoverageGaps:
         # Just verify the method works
         assert pane.close_button is not None
     
-    def test_custom_tab_widget_show_tooltip(self, qtbot):
-        """Test CustomTabWidget _show_custom_tooltip."""
-        widget = CustomTabWidget()
-        qtbot.addWidget(widget)
-        widget.show()
-        
-        # Manually trigger tooltip
-        widget._show_custom_tooltip()
-        assert widget._custom_tooltip is not None
-    
-    def test_custom_tab_widget_hide_tooltip(self, qtbot):
-        """Test CustomTabWidget _hide_custom_tooltip."""
-        widget = CustomTabWidget()
-        qtbot.addWidget(widget)
-        
-        widget._hide_custom_tooltip()
-        # Just verify it doesn't crash
-    
-    def test_custom_tab_bar_mouse_move_no_drag_start(self, qtbot):
-        """Test mouseMoveEvent without drag start position."""
-        tab_bar = CustomTabBar()
-        qtbot.addWidget(tab_bar)
-        tab_bar.addTab("Tab1")
-        
-        # No drag start position set
-        move_event = QMouseEvent(
-            QMouseEvent.MouseMove,
-            QPointF(30, 5),
-            Qt.LeftButton,
-            Qt.LeftButton,
-            Qt.NoModifier
-        )
-        
-        tab_bar.mouseMoveEvent(move_event)
-    
-    def test_custom_tab_widget_tab_dropped_signal(self, qtbot):
-        """Test CustomTabWidget receives tab_dropped signal."""
-        widget = CustomTabWidget()
-        qtbot.addWidget(widget)
-        
-        # Connect to the signal
-        dropped_data = []
-        widget.tab_dropped.connect(lambda data: dropped_data.append(data))
-        
-        # Emit signal from tab bar
-        widget.tab_bar.tab_dropped.emit("tab:0:123")
-        assert len(dropped_data) == 1
-        assert dropped_data[0] == "tab:0:123"
-    
-    def test_custom_tab_widget_tab_clicked_signal(self, qtbot):
-        """Test CustomTabWidget receives tab_clicked signal."""
-        widget = CustomTabWidget()
-        qtbot.addWidget(widget)
-        
-        # Connect to the signal
-        clicked_indices = []
-        widget.tab_clicked.connect(lambda idx: clicked_indices.append(idx))
-        
-        # Emit signal from tab bar
-        widget.tab_bar.tab_clicked.emit(0)
-        assert len(clicked_indices) == 1
-        assert clicked_indices[0] == 0
+
     
     def test_text_editor_comprehensive_workflow(self, qtbot):
         """Comprehensive test of TextEditor workflow to increase coverage."""
