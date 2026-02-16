@@ -6203,6 +6203,262 @@ class TestCloseSplitPane:
             pass
 
 
+class TestMultiFileFindAndReplace:
+    """Tests for multi-file find and replace functionality."""
+    
+    def test_find_all_files_finds_text_in_multiple_files(self, qtbot, tmp_path):
+        """Test that find_all_files searches across multiple files."""
+        from main import MultiFileSearchDialog
+        
+        text_editor = TextEditor()
+        qtbot.addWidget(text_editor)
+        
+        # Create a test folder structure
+        test_folder = tmp_path / "project"
+        test_folder.mkdir()
+        
+        # Create multiple files with searchable content
+        file1 = test_folder / "file1.txt"
+        file1.write_text("Hello World\nGoodbye World\n")
+        
+        file2 = test_folder / "file2.txt"
+        file2.write_text("Hello there\nWorld peace\n")
+        
+        file3 = test_folder / "file3.py"
+        file3.write_text("# Hello\nprint('Hello')\n")
+        
+        # Navigate to the test folder
+        text_editor.file_model.setRootPath(str(test_folder))
+        text_editor.file_tree.setRootIndex(text_editor.file_model.index(str(test_folder)))
+        
+        # Create a multi-file search dialog
+        search_dialog = MultiFileSearchDialog(str(test_folder), text_editor)
+        qtbot.addWidget(search_dialog)
+        search_dialog.find_input.setText("Hello")
+        
+        # Mock the warning dialog to avoid user interaction
+        with patch('main.QMessageBox.warning'):
+            results = search_dialog.find_all_files()
+        
+        # Verify results
+        assert len(results) > 0, "Should find matches"
+        # Should find "Hello" in all 3 files (1 in file1, 1 in file2, 2 in file3)
+        assert len(results) >= 4, f"Expected at least 4 matches, got {len(results)}"
+        
+        # Verify results contain all files
+        files_found = set(result[0] for result in results)
+        assert len(files_found) == 3, "Should find text in all 3 files"
+    
+    def test_find_all_files_handles_nested_folders(self, qtbot, tmp_path):
+        """Test that find_all_files searches in nested directories."""
+        from main import MultiFileSearchDialog
+        
+        text_editor = TextEditor()
+        qtbot.addWidget(text_editor)
+        
+        # Create nested folder structure
+        test_folder = tmp_path / "project"
+        test_folder.mkdir()
+        
+        subdir1 = test_folder / "src"
+        subdir1.mkdir()
+        
+        subdir2 = subdir1 / "utils"
+        subdir2.mkdir()
+        
+        # Create files at different levels
+        (test_folder / "readme.txt").write_text("TODO: implement")
+        (subdir1 / "main.py").write_text("# TODO: fix bug")
+        (subdir2 / "helper.py").write_text("TODO: optimize")
+        
+        # Setup search dialog
+        search_dialog = MultiFileSearchDialog(str(test_folder), text_editor)
+        qtbot.addWidget(search_dialog)
+        search_dialog.find_input.setText("TODO")
+        
+        # Mock the warning dialog
+        with patch('main.QMessageBox.warning'):
+            results = search_dialog.find_all_files()
+        
+        # Verify it finds matches in all nested files
+        assert len(results) == 3, f"Should find 3 TODO matches, got {len(results)}"
+    
+    def test_replace_all_files_replaces_in_multiple_files(self, qtbot, tmp_path):
+        """Test that replace_all_files replaces text across multiple files."""
+        from main import MultiFileSearchDialog
+        
+        text_editor = TextEditor()
+        qtbot.addWidget(text_editor)
+        
+        # Create test files
+        test_folder = tmp_path / "project"
+        test_folder.mkdir()
+        
+        file1 = test_folder / "file1.txt"
+        file1.write_text("old value\nnew value\n")
+        
+        file2 = test_folder / "file2.txt"
+        file2.write_text("old value\nold value\n")
+        
+        # Navigate to the test folder
+        text_editor.file_model.setRootPath(str(test_folder))
+        text_editor.file_tree.setRootIndex(text_editor.file_model.index(str(test_folder)))
+        
+        # Create multi-file search/replace dialog
+        search_dialog = MultiFileSearchDialog(str(test_folder), text_editor)
+        qtbot.addWidget(search_dialog)
+        search_dialog.find_input.setText("old value")
+        search_dialog.replace_input.setText("updated value")
+        
+        # Mock the information dialog to capture the result message
+        with patch('main.QMessageBox.information') as mock_info:
+            with patch('main.QMessageBox.warning'):
+                search_dialog.replace_all_files()
+        
+        # Verify dialog was called with results
+        assert mock_info.called, "Completion dialog should be shown"
+        
+        # Verify files were updated
+        file1_content = file1.read_text()
+        file2_content = file2.read_text()
+        
+        assert "updated value" in file1_content, "file1 should be updated"
+        assert "updated value" in file2_content, "file2 should be updated"
+        assert "old value" not in file1_content, "file1 should not contain old value"
+        assert "old value" not in file2_content, "file2 should not contain old value"
+    
+    def test_replace_all_files_preserves_case_insensitive_matching(self, qtbot, tmp_path):
+        """Test that replace_all_files matches case-insensitively but preserves content."""
+        from main import MultiFileSearchDialog
+        
+        text_editor = TextEditor()
+        qtbot.addWidget(text_editor)
+        
+        # Create test file with mixed case
+        test_folder = tmp_path / "project"
+        test_folder.mkdir()
+        
+        test_file = test_folder / "test.txt"
+        test_file.write_text("Hello HELLO hello HeLLo\n")
+        
+        # Setup search/replace dialog
+        search_dialog = MultiFileSearchDialog(str(test_folder), text_editor)
+        qtbot.addWidget(search_dialog)
+        search_dialog.find_input.setText("hello")
+        search_dialog.replace_input.setText("goodbye")
+        
+        # Mock dialogs
+        with patch('main.QMessageBox.information'):
+            with patch('main.QMessageBox.warning'):
+                search_dialog.replace_all_files()
+        
+        # All variations of "hello" should be replaced
+        content = test_file.read_text()
+        assert content.count("goodbye") == 4, "All case variations should be replaced"
+        assert "hello" not in content.lower(), "No hello variants should remain"
+    
+    def test_replace_all_files_counts_replacements_correctly(self, qtbot, tmp_path):
+        """Test that replace_all_files reports correct replacement count."""
+        from main import MultiFileSearchDialog
+        
+        text_editor = TextEditor()
+        qtbot.addWidget(text_editor)
+        
+        # Create test files with known replacement count
+        test_folder = tmp_path / "project"
+        test_folder.mkdir()
+        
+        file1 = test_folder / "file1.txt"
+        file1.write_text("find find find\n")  # 3 occurrences
+        
+        file2 = test_folder / "file2.txt"
+        file2.write_text("find\nfind\n")  # 2 occurrences
+        
+        # Setup search/replace dialog
+        search_dialog = MultiFileSearchDialog(str(test_folder), text_editor)
+        qtbot.addWidget(search_dialog)
+        search_dialog.find_input.setText("find")
+        search_dialog.replace_input.setText("replace")
+        
+        # Mock to capture the completion message
+        with patch('main.QMessageBox.information') as mock_info:
+            with patch('main.QMessageBox.warning'):
+                search_dialog.replace_all_files()
+        
+        # Verify the completion message contains correct count
+        completion_message = mock_info.call_args[0][2]
+        assert "5" in completion_message, f"Should report 5 replacements, got: {completion_message}"
+    
+    def test_replace_all_files_handles_file_errors_gracefully(self, qtbot, tmp_path):
+        """Test that replace_all_files handles file access errors gracefully."""
+        from main import MultiFileSearchDialog
+        
+        text_editor = TextEditor()
+        qtbot.addWidget(text_editor)
+        
+        # Create test folder and file
+        test_folder = tmp_path / "project"
+        test_folder.mkdir()
+        
+        test_file = test_folder / "test.txt"
+        test_file.write_text("find this\n")
+        
+        # Setup search/replace dialog
+        search_dialog = MultiFileSearchDialog(str(test_folder), text_editor)
+        qtbot.addWidget(search_dialog)
+        search_dialog.find_input.setText("find")
+        search_dialog.replace_input.setText("replace")
+        
+        # Mock open to raise an exception for one file
+        original_open = open
+        call_count = [0]
+        
+        def mock_open_func(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] > 1:  # Raise error on write attempt
+                raise IOError("Permission denied")
+            return original_open(*args, **kwargs)
+        
+        # Mock dialogs and file operations
+        with patch('main.QMessageBox.information') as mock_info:
+            with patch('main.QMessageBox.warning') as mock_warning:
+                with patch('builtins.open', mock_open_func):
+                    search_dialog.replace_all_files()
+        
+        # Should still show completion even with errors
+        assert mock_info.called or mock_warning.called, "Should handle error and show message"
+    
+    def test_replace_all_files_no_matches_shows_info(self, qtbot, tmp_path):
+        """Test that replace_all_files shows info when no matches found."""
+        from main import MultiFileSearchDialog
+        
+        text_editor = TextEditor()
+        qtbot.addWidget(text_editor)
+        
+        # Create test files without the search term
+        test_folder = tmp_path / "project"
+        test_folder.mkdir()
+        
+        (test_folder / "file1.txt").write_text("content without search term\n")
+        (test_folder / "file2.txt").write_text("more content\n")
+        
+        # Setup search/replace dialog
+        search_dialog = MultiFileSearchDialog(str(test_folder), text_editor)
+        qtbot.addWidget(search_dialog)
+        search_dialog.find_input.setText("nonexistent")
+        search_dialog.replace_input.setText("replacement")
+        
+        # Mock dialogs
+        with patch('main.QMessageBox.information') as mock_info:
+            with patch('main.QMessageBox.warning') as mock_warning:
+                search_dialog.replace_all_files()
+        
+        # Should show "No Results" info message
+        assert mock_info.called, "Should show info message"
+        message = mock_info.call_args[0][2]
+        assert "No matches" in message, f"Should say no matches found, got: {message}"
+
+
 class TestFileTreeContextMenuOperations:
     """Tests for file tree context menu operations."""
 

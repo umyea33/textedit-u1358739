@@ -92,3 +92,7 @@ class TestNewFeature:
         pass"""
    ```
 5. **Never nest classes** - If indentation looks nested, use `git checkout test_editor.py` to revert and try again
+
+
+### Other Hints
+Remove any dead code
