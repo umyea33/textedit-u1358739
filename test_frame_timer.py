@@ -176,6 +176,6 @@ def test_frame_timer_display_text(qtbot):
     
     # Should have timing values in text
     text = widget.text()
-    assert "Frame:" in text or "ms" in text
+    assert "Last Frame:" in text or "ms" in text
     assert "Avg:" in text or "ms" in text
     assert "Max:" in text or "ms" in text

@@ -122,9 +122,9 @@ class FrameTimerWidget(QLabel):
     def update_display(self):
         """Update the display text."""
         if not self.is_visible or not self.frame_times:
-            self.setText("Frame: -- ms | Avg: -- ms | Max: -- ms")
+            self.setText("Last Frame: -- ms | Avg: -- ms | Max: -- ms")
         else:
-            text = f"Frame: {self.last_frame_time:.1f} ms | Avg: {self.avg_frame_time:.1f} ms | Max: {self.max_frame_time:.1f} ms"
+            text = f"Last Frame: {self.last_frame_time:.1f} ms | Avg: {self.avg_frame_time:.1f} ms | Max: {self.max_frame_time:.1f} ms"
             self.setText(text)
 
 

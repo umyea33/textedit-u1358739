@@ -46,7 +46,7 @@ def test_frame_timer_complete_workflow(qtbot):
     
     # Display should show meaningful data
     text = editor.frame_timer_widget.text()
-    assert "Frame:" in text
+    assert "Last Frame:" in text
     assert "Avg:" in text
     assert "Max:" in text
     
