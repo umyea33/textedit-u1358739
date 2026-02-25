@@ -12,8 +12,112 @@ from PySide6.QtGui import (
     QTextCursor, QFontMetrics, QPalette, QShortcut, QTextCharFormat,
     QSyntaxHighlighter, QTextDocument
 )
-from PySide6.QtCore import Qt, QRect, QSize, QDir, Signal, QTimer, QPoint, QMimeData, QUrl, QRegularExpression
+from PySide6.QtCore import Qt, QRect, QSize, QDir, Signal, QTimer, QPoint, QMimeData, QUrl, QRegularExpression, QElapsedTimer
 from PySide6.QtGui import QDrag
+import time
+
+
+class FrameTimerWidget(QLabel):
+    """Widget that displays frame timing statistics (last, average, max).
+    
+    Shows timing metrics in milliseconds:
+    - Frame: Time since last user activity event
+    - Avg: Average of last 120 frame times
+    - Max: Maximum frame time recorded
+    
+    Idle time is automatically subtracted - frames are only counted when user
+    activity occurred within the last 100ms. Use Ctrl+P to toggle visibility.
+    Timings reset when the widget is hidden.
+    """
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("""
+            QLabel {
+                background-color: #333333;
+                color: #cccccc;
+                padding: 8px 12px;
+                border: 1px solid #555555;
+                border-radius: 3px;
+                font-size: 11px;
+                font-family: monospace;
+            }
+        """)
+        self.setFixedHeight(40)
+        
+        # Frame timing data
+        self.frame_times = []
+        self.last_frame_time = 0.0
+        self.max_frame_time = 0.0
+        self.avg_frame_time = 0.0
+        self.is_visible = False
+        
+        # Timer to update frame timings
+        self.frame_timer = QTimer(self)
+        self.frame_timer.timeout.connect(self.update_frame_timing)
+        self.frame_timer.setInterval(16)  # ~60 FPS
+        
+        # Track when we should idle
+        self.last_event_time = time.time()
+        self.idle_threshold = 0.1  # 100ms of no events = idle
+    
+    def start_timing(self):
+        """Start measuring frame times."""
+        self.is_visible = True
+        self.show()
+        self.last_event_time = time.time()
+        self.frame_timer.start()
+        self.update_display()
+    
+    def stop_timing(self):
+        """Stop measuring frame times and reset."""
+        self.is_visible = False
+        self.frame_timer.stop()
+        self.reset_timings()
+        self.hide()
+    
+    def reset_timings(self):
+        """Reset all timing data."""
+        self.frame_times = []
+        self.last_frame_time = 0.0
+        self.max_frame_time = 0.0
+        self.avg_frame_time = 0.0
+    
+    def record_activity(self):
+        """Record that an event occurred (used to detect idle time)."""
+        self.last_event_time = time.time()
+    
+    def update_frame_timing(self):
+        """Update frame timing calculations."""
+        if not self.is_visible:
+            return
+        
+        current_time = time.time()
+        time_since_event = current_time - self.last_event_time
+        
+        # Only count as a real frame if we're not idle
+        if time_since_event < self.idle_threshold:
+            # Subtract idle time from this measurement
+            frame_time = (time_since_event * 1000)  # Convert to ms
+            
+            # Keep last 120 frames for averaging
+            self.frame_times.append(frame_time)
+            if len(self.frame_times) > 120:
+                self.frame_times.pop(0)
+            
+            self.last_frame_time = frame_time
+            self.max_frame_time = max(self.frame_times)
+            self.avg_frame_time = sum(self.frame_times) / len(self.frame_times) if self.frame_times else 0.0
+        
+        self.update_display()
+    
+    def update_display(self):
+        """Update the display text."""
+        if not self.is_visible or not self.frame_times:
+            self.setText("Frame: -- ms | Avg: -- ms | Max: -- ms")
+        else:
+            text = f"Frame: {self.last_frame_time:.1f} ms | Avg: {self.avg_frame_time:.1f} ms | Max: {self.max_frame_time:.1f} ms"
+            self.setText(text)
 
 
 class WelcomeScreen(QWidget):
@@ -938,6 +1042,10 @@ class CodeEditor(QPlainTextEdit):
         
         # For all other keys, use default behavior
         super().keyPressEvent(event)
+        
+        # Record activity for frame timer
+        if hasattr(self, '_frame_timer_callback'):
+            self._frame_timer_callback()
     
     def line_number_area_paint_event(self, event):
         painter = QPainter(self.line_number_area)
@@ -1534,8 +1642,11 @@ class TextEditor(QMainWindow):
          self.zoom_indicator_timer.timeout.connect(self.hide_zoom_indicator)
          self.split_panes = []  # List of SplitEditorPane objects
          self.active_pane = None  # Currently focused pane
+         self.frame_timer_visible = False  # Track frame timer visibility
          self.init_ui()
          self.apply_dark_theme()
+         # Setup frame timer toggle shortcut
+         QShortcut(QKeySequence("Ctrl+P"), self, self.toggle_frame_timer)
          # Focus on editor so user can start typing immediately
          if self.editor:
              self.editor.setFocus()
@@ -1771,6 +1882,11 @@ class TextEditor(QMainWindow):
          self.status_bar.addPermanentWidget(self.encoding_label)
          self.status_bar.addPermanentWidget(QLabel("  |  "))
          self.status_bar.addPermanentWidget(self.file_type_label)
+         
+         # Create frame timer widget (hidden by default)
+         self.frame_timer_widget = FrameTimerWidget()
+         self.frame_timer_widget.hide()
+         self.status_bar.addPermanentWidget(self.frame_timer_widget)
          
          # Create zoom indicator (hidden by default)
          self.zoom_indicator = QLabel()
@@ -2185,8 +2301,12 @@ class TextEditor(QMainWindow):
         """Create a new editor tab."""
         editor = CodeEditor()
         editor.textChanged.connect(self.on_text_changed)
+        editor.textChanged.connect(self.on_editor_activity)
         editor.cursorPositionChanged.connect(self.update_cursor_position)
+        editor.cursorPositionChanged.connect(self.on_editor_activity)
         editor.focusReceived.connect(self.on_editor_focus_received)
+        # Set callback for frame timer activity recording
+        editor._frame_timer_callback = self.on_editor_activity
         
         if file_path:
             tab_name = os.path.basename(file_path)
@@ -2748,6 +2868,11 @@ class TextEditor(QMainWindow):
          col = cursor.columnNumber() + 1
          self.cursor_label.setText(f"Ln {line}, Col {col}")
     
+    def on_editor_activity(self):
+        """Record editor activity for frame timer."""
+        if self.frame_timer_visible and hasattr(self, 'frame_timer_widget'):
+            self.frame_timer_widget.record_activity()
+    
     def on_editor_focus_received(self):
          """Update active pane when an editor receives focus."""
          editor = self.sender()
@@ -2954,6 +3079,15 @@ class TextEditor(QMainWindow):
         self.zoom_indicator.setText(f"{zoom_percent}%")
     
 
+    def toggle_frame_timer(self):
+        """Toggle frame timer visibility with Ctrl+P."""
+        if self.frame_timer_visible:
+            self.frame_timer_widget.stop_timing()
+            self.frame_timer_visible = False
+        else:
+            self.frame_timer_widget.start_timing()
+            self.frame_timer_visible = True
+    
     def show_about(self):
          QMessageBox.about(
              self, "About TextEdit",
