@@ -96,3 +96,5 @@ class TestNewFeature:
 
 ### Other Hints
 Remove any dead code
+
+Look in ASSIGNMENT.md to see the overall vision of what I am trying to do.  Week 8 is done and I am currently working on week 9.
