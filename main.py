@@ -2991,7 +2991,7 @@ class TextEditor(QMainWindow):
             
             if defer_loading:
                 # Defer setting plain text to next frame to avoid UI blocking
-                editor._pending_file_load = (file_path, content)
+                editor._pending_file_load = (file_path, content, file_size)
                 # Defer actual text loading to next frame
                 QTimer.singleShot(0, lambda e=editor, fp=file_path: self._deferred_load_text(e, fp))
             else:
@@ -3011,7 +3011,9 @@ class TextEditor(QMainWindow):
         if not hasattr(editor, '_pending_file_load') or editor._pending_file_load is None:
             return
         
-        _, content = editor._pending_file_load
+        pending = editor._pending_file_load
+        _, content = pending[0], pending[1]
+        file_size = pending[2] if len(pending) > 2 else len(content.encode('utf-8'))
         editor._pending_file_load = None
         
         # Check if deferred loading is enabled (disabled during tests by default)
@@ -3020,7 +3022,6 @@ class TextEditor(QMainWindow):
         
         # For all files, use deferred loading to keep frame times low
         # Use memory-mapped approach: store content directly and load chunks by byte offset
-        file_size = len(content.encode('utf-8'))
         
         if defer_loading and file_size > 50 * 1024 * 1024:  # 50MB - very large file
             # For very large files, chunk by small character count to keep frame times under 16ms
