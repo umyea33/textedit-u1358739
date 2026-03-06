@@ -3004,8 +3004,13 @@ class TextEditor(QMainWindow):
                 QTimer.singleShot(0, lambda e=editor, fp=file_path: self._deferred_load_text(e, fp))
             else:
                 # Deferred loading disabled - load immediately (for tests)
+                # Block signals during text loading to prevent unsaved indicator from showing
+                if isinstance(content, bytes):
+                    content = content.decode('utf-8', errors='ignore')
+                editor.blockSignals(True)
                 editor.setPlainText(content)
                 editor.document().setModified(False)
+                editor.blockSignals(False)
             
             # Focus on editor so user can start typing immediately
             editor.setFocus()
@@ -3050,8 +3055,11 @@ class TextEditor(QMainWindow):
             # Load all at once (either deferred loading disabled or file is small enough)
             if isinstance(content, bytes):
                 content = content.decode('utf-8', errors='ignore')
+            # Block signals during text loading to prevent unsaved indicator from showing
+            editor.blockSignals(True)
             editor.setPlainText(content)
             editor.document().setModified(False)
+            editor.blockSignals(False)
     
     def _load_next_chunk(self, editor):
         """Load the next chunk of content (bytes), decode and insert."""
