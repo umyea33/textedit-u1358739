@@ -864,7 +864,9 @@ class SyntaxHighlighter(QSyntaxHighlighter):
         """Change the highlighting language."""
         self.language = language
         self._setup_rules()
-        self.rehighlight()
+        # Only rehighlight if there are rules to apply
+        if self.language and self.language in self.LANGUAGES and self.rules:
+            self.rehighlight()
     
     def set_language_from_file(self, file_path):
         """Detect and set language from file extension."""
@@ -995,13 +997,15 @@ class CodeEditor(QPlainTextEdit):
         self.highlighting_enabled = True
         self.highlighter.set_language_from_file(file_path)
         
-        # For large files, highlight only visible blocks initially
-        if self.is_large_file:
-            self.highlight_visible_blocks()
-            self.highlight_timer.start()
-        else:
-            # For small files, highlight everything immediately
-            self.highlighter.rehighlight()
+        # Only do highlighting work if the language has highlighting rules
+        if self.highlighter.rules:
+            # For large files, highlight only visible blocks initially
+            if self.is_large_file:
+                self.highlight_visible_blocks()
+                self.highlight_timer.start()
+            else:
+                # For small files, highlight everything immediately
+                self.highlighter.rehighlight()
     
     def set_text_color(self, color):
         """Set the text color for the editor."""
