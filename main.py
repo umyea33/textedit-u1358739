@@ -2933,16 +2933,17 @@ class TextEditor(QMainWindow):
                 # If file is in a different pane, we'll open it in the active pane (don't return, continue below)
             
             # Load file content with mmap for large files
+            # Keep as raw bytes to avoid full decode/encode overhead for large files
             file_size = os.path.getsize(file_path)
             
             if file_size > 10 * 1024 * 1024:  # 10MB threshold for mmap
-                # Use memory-mapped file for very large files
-                with open(file_path, 'r', encoding='utf-8') as f:
+                # Use memory-mapped file for very large files - keep as bytes
+                with open(file_path, 'rb') as f:
                     with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mmapped_file:
-                        content = mmapped_file.read().decode('utf-8', errors='ignore')
+                        content = bytes(mmapped_file[:])  # Copy to bytes object
             else:
                 # Normal read for smaller files
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, 'rb') as f:
                     content = f.read()
             
             # Use current tab if it's untitled and unmodified, otherwise create new tab
@@ -2969,9 +2970,16 @@ class TextEditor(QMainWindow):
             # Check if deferred loading is enabled
             defer_loading = os.environ.get('ENABLE_DEFERRED_LOAD', 'true').lower() == 'true'
             
-            # Store saved content for comparison
+            # Store saved content for comparison (decode for smaller files, keep bytes for large)
             tab_index = self.tab_widget.currentIndex()
-            self.saved_content[(self.active_pane, tab_index)] = content
+            if isinstance(content, bytes) and file_size > 50 * 1024 * 1024:
+                # For very large files, store None for now (we'll decode on demand later)
+                self.saved_content[(self.active_pane, tab_index)] = None
+            else:
+                # For smaller files, decode now for comparison
+                if isinstance(content, bytes):
+                    content = content.decode('utf-8', errors='ignore')
+                self.saved_content[(self.active_pane, tab_index)] = content
             
             # Update tab title
             tab_name = os.path.basename(file_path)
@@ -3013,7 +3021,7 @@ class TextEditor(QMainWindow):
         
         pending = editor._pending_file_load
         _, content = pending[0], pending[1]
-        file_size = pending[2] if len(pending) > 2 else len(content.encode('utf-8'))
+        file_size = pending[2] if len(pending) > 2 else len(content)
         editor._pending_file_load = None
         
         # Check if deferred loading is enabled (disabled during tests by default)
@@ -3021,42 +3029,55 @@ class TextEditor(QMainWindow):
         defer_loading = os.environ.get('ENABLE_DEFERRED_LOAD', 'true').lower() == 'true'
         
         # For all files, use deferred loading to keep frame times low
-        # Use memory-mapped approach: store content directly and load chunks by byte offset
+        # Content is kept as bytes to avoid massive upfront decode
         
         if defer_loading and file_size > 50 * 1024 * 1024:  # 50MB - very large file
-            # For very large files, chunk by small character count to keep frame times under 16ms
+            # For very large files, chunk by bytes to keep frame times under 16ms
             # Aggressive chunking: 125KB per frame keeps responsiveness high
             chunk_size = 125 * 1024  # 125KB per chunk
-            editor._load_content = content  # Store full content
+            editor._load_content = content  # Store full content as bytes
             editor._load_offset = 0
             editor._load_chunk_size = chunk_size
             editor._loading_content = True  # Flag to skip on_text_changed during loading
+            # Create incremental decoder to handle UTF-8 boundaries properly
+            import codecs
+            editor._decoder = codecs.getincrementaldecoder('utf-8')(errors='ignore')
             
             editor._load_timer = QTimer(editor)
             editor._load_timer.timeout.connect(lambda e=editor: self._load_next_chunk(e))
             editor._load_timer.start(16)  # ~60fps
         else:
             # Load all at once (either deferred loading disabled or file is small enough)
+            if isinstance(content, bytes):
+                content = content.decode('utf-8', errors='ignore')
             editor.setPlainText(content)
             editor.document().setModified(False)
     
     def _load_next_chunk(self, editor):
-        """Load the next chunk of content."""
+        """Load the next chunk of content (bytes), decode and insert."""
         if not hasattr(editor, '_load_content'):
             return
         
-        content = editor._load_content
+        content_bytes = editor._load_content
         offset = editor._load_offset
         chunk_size = editor._load_chunk_size
         
-        # Extract next chunk
-        next_offset = min(offset + chunk_size, len(content))
-        chunk = content[offset:next_offset]
+        # Extract next byte chunk
+        next_offset = min(offset + chunk_size, len(content_bytes))
+        byte_chunk = content_bytes[offset:next_offset]
         
-        if not chunk:
+        if not byte_chunk:
             # Done loading - clear loading flag and mark as unmodified
             editor._load_timer.stop()
             editor._loading_content = False  # Allow on_text_changed to run again
+            # Flush any remaining bytes in the decoder
+            if hasattr(editor, '_decoder'):
+                final_text = editor._decoder.decode(b'', final=True)
+                if final_text:
+                    cursor = editor.textCursor()
+                    cursor.movePosition(QTextCursor.End)
+                    cursor.insertText(final_text)
+                del editor._decoder
             editor.document().setModified(False)
             del editor._load_content
             del editor._load_offset
@@ -3065,17 +3086,25 @@ class TextEditor(QMainWindow):
             del editor._loading_content
             return
         
-        # Load chunk using cursor operations - more efficient than setPlainText
+        # Decode this byte chunk using incremental decoder (handles UTF-8 boundaries)
+        text_chunk = editor._decoder.decode(byte_chunk, final=False)
+        
+        if not text_chunk:
+            # Decoder buffered the bytes (partial UTF-8 char), move offset and return
+            editor._load_offset = next_offset
+            return
+        
+        # Insert decoded text using cursor operations
         cursor = editor.textCursor()
         if offset == 0:
             # First chunk: clear document and insert
             cursor.select(QTextCursor.Document)
             cursor.removeSelectedText()
-            cursor.insertText(chunk)
+            cursor.insertText(text_chunk)
         else:
-            # Subsequent chunks: append using beginEditBlock for efficiency
+            # Subsequent chunks: append
             cursor.movePosition(QTextCursor.End)
-            cursor.insertText(chunk)
+            cursor.insertText(text_chunk)
         
         editor._load_offset = next_offset
     
