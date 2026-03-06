@@ -12,11 +12,19 @@ Run with: pytest tests/test_timing.py -v -s
 Results are displayed as test output and can be collected for analysis.
 """
 import os
+import sys
 import time
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QKeySequence
-from main import TextEditor
+from pathlib import Path
+
+# Add parent directory to path so we can find main.py
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+os.chdir(PROJECT_ROOT)  # Change to project root so file paths work
+
+from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtCore import Qt, QTimer, QCoreApplication
+from PySide6.QtGui import QKeySequence, QTextCursor, QKeyEvent
+from main import TextEditor, FindReplaceDialog
 
 
 class TimingResults:
@@ -124,10 +132,11 @@ class TimingTestBase:
 class TestSmallFile(TimingTestBase):
     """Timing tests for small.txt."""
     
-    def test_opening_file(self):
+    def test_opening_file(self, qtbot):
         """Measure frame time for opening small.txt."""
         # Reset any previous timing
         self.editor = TextEditor()
+        qtbot.addWidget(self.editor)
         self.editor.show()
         QApplication.processEvents()
         
@@ -151,7 +160,7 @@ class TestSmallFile(TimingTestBase):
         self.record_timing("Max Opening File", "small.txt")
         assert True
     
-    def test_scroll(self):
+    def test_scroll(self, qtbot):
         """Measure frame time for scrolling in small.txt."""
         self.open_editor_with_file("small.txt")
         
@@ -160,7 +169,9 @@ class TestSmallFile(TimingTestBase):
         
         # Simulate scrolling
         for _ in range(20):
-            self.editor.editor.moveCursor(self.editor.editor.textCursor().Down)
+            cursor = self.editor.editor.textCursor()
+            cursor.movePosition(QTextCursor.Down)
+            self.editor.editor.setTextCursor(cursor)
             QApplication.processEvents()
             time.sleep(0.01)
         
@@ -168,7 +179,7 @@ class TestSmallFile(TimingTestBase):
         self.record_timing("Max Scroll", "small.txt")
         assert True
     
-    def test_click_far_away(self):
+    def test_click_far_away(self, qtbot):
         """Measure frame time for clicking far away in scroll bar for small.txt."""
         self.open_editor_with_file("small.txt")
         
@@ -176,7 +187,9 @@ class TestSmallFile(TimingTestBase):
         self.toggle_frame_timer()
         
         # Click near bottom of document
-        self.editor.editor.moveCursor(self.editor.editor.textCursor().End)
+        cursor = self.editor.editor.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self.editor.editor.setTextCursor(cursor)
         QApplication.processEvents()
         time.sleep(0.05)
         
@@ -184,21 +197,16 @@ class TestSmallFile(TimingTestBase):
         self.record_timing("Max Click Far Away", "small.txt")
         assert True
     
-    def test_find_replace(self):
+    def test_find_replace(self, qtbot):
         """Measure frame time for find & replace in small.txt."""
         self.open_editor_with_file("small.txt")
         
-        # Open find/replace dialog
-        self.editor.open_find_replace()
+        # Create find/replace dialog
+        find_dialog = FindReplaceDialog(self.editor.editor, self.editor)
+        qtbot.addWidget(find_dialog)
+        find_dialog.show()
         QApplication.processEvents()
         time.sleep(0.1)
-        
-        # Find the dialog
-        find_dialog = None
-        for widget in QApplication.topLevelWidgets():
-            if 'FindReplace' in widget.__class__.__name__:
-                find_dialog = widget
-                break
         
         if find_dialog:
             # Start frame timer
@@ -213,13 +221,24 @@ class TestSmallFile(TimingTestBase):
             # Perform replace all
             find_dialog.replace_all()
             
+            # Use a timer to press Enter key to dismiss the message box
+            def press_enter():
+                qtbot.keyClick(QApplication.instance().activeWindow(), Qt.Key_Return)
+            
+            timer = QTimer()
+            timer.setSingleShot(True)
+            timer.timeout.connect(press_enter)
+            timer.start(500)  # Press Enter after 500ms
+            
             # Wait for completion
             timeout = time.time() + 30
             while time.time() < timeout:
                 QApplication.processEvents()
-                time.sleep(0.001)
+                time.sleep(0.01)
                 if not hasattr(find_dialog, '_replace_state'):
                     break
+            
+            timer.stop()
             
             # Record results
             self.record_timing("Max Find & Replace", "small.txt")
@@ -234,9 +253,10 @@ class TestSmallFile(TimingTestBase):
 class TestMediumFile(TimingTestBase):
     """Timing tests for medium.txt."""
     
-    def test_opening_file(self):
+    def test_opening_file(self, qtbot):
         """Measure frame time for opening medium.txt."""
         self.editor = TextEditor()
+        qtbot.addWidget(self.editor)
         self.editor.show()
         QApplication.processEvents()
         
@@ -260,7 +280,7 @@ class TestMediumFile(TimingTestBase):
         self.record_timing("Max Opening File", "medium.txt")
         assert True
     
-    def test_scroll(self):
+    def test_scroll(self, qtbot):
         """Measure frame time for scrolling in medium.txt."""
         self.open_editor_with_file("medium.txt")
         
@@ -269,7 +289,9 @@ class TestMediumFile(TimingTestBase):
         
         # Simulate scrolling
         for _ in range(30):
-            self.editor.editor.moveCursor(self.editor.editor.textCursor().Down)
+            cursor = self.editor.editor.textCursor()
+            cursor.movePosition(QTextCursor.Down)
+            self.editor.editor.setTextCursor(cursor)
             QApplication.processEvents()
             time.sleep(0.01)
         
@@ -277,7 +299,7 @@ class TestMediumFile(TimingTestBase):
         self.record_timing("Max Scroll", "medium.txt")
         assert True
     
-    def test_click_far_away(self):
+    def test_click_far_away(self, qtbot):
         """Measure frame time for clicking far away in scroll bar for medium.txt."""
         self.open_editor_with_file("medium.txt")
         
@@ -285,7 +307,9 @@ class TestMediumFile(TimingTestBase):
         self.toggle_frame_timer()
         
         # Click near bottom of document
-        self.editor.editor.moveCursor(self.editor.editor.textCursor().End)
+        cursor = self.editor.editor.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self.editor.editor.setTextCursor(cursor)
         QApplication.processEvents()
         time.sleep(0.05)
         
@@ -293,21 +317,16 @@ class TestMediumFile(TimingTestBase):
         self.record_timing("Max Click Far Away", "medium.txt")
         assert True
     
-    def test_find_replace(self):
+    def test_find_replace(self, qtbot):
         """Measure frame time for find & replace in medium.txt."""
         self.open_editor_with_file("medium.txt")
         
-        # Open find/replace dialog
-        self.editor.open_find_replace()
+        # Create find/replace dialog
+        find_dialog = FindReplaceDialog(self.editor.editor, self.editor)
+        qtbot.addWidget(find_dialog)
+        find_dialog.show()
         QApplication.processEvents()
         time.sleep(0.1)
-        
-        # Find the dialog
-        find_dialog = None
-        for widget in QApplication.topLevelWidgets():
-            if 'FindReplace' in widget.__class__.__name__:
-                find_dialog = widget
-                break
         
         if find_dialog:
             # Start frame timer
@@ -322,13 +341,24 @@ class TestMediumFile(TimingTestBase):
             # Perform replace all
             find_dialog.replace_all()
             
+            # Use a timer to press Enter key to dismiss the message box
+            def press_enter():
+                qtbot.keyClick(QApplication.instance().activeWindow(), Qt.Key_Return)
+            
+            timer = QTimer()
+            timer.setSingleShot(True)
+            timer.timeout.connect(press_enter)
+            timer.start(500)  # Press Enter after 500ms
+            
             # Wait for completion
             timeout = time.time() + 60
             while time.time() < timeout:
                 QApplication.processEvents()
-                time.sleep(0.001)
+                time.sleep(0.01)
                 if not hasattr(find_dialog, '_replace_state'):
                     break
+            
+            timer.stop()
             
             # Record results
             self.record_timing("Max Find & Replace", "medium.txt")
@@ -343,7 +373,7 @@ class TestMediumFile(TimingTestBase):
 class TestLargeFile(TimingTestBase):
     """Timing tests for large.txt."""
     
-    def test_opening_file(self):
+    def test_opening_file(self, qtbot):
         """Measure frame time for opening large.txt."""
         if not os.path.exists("large.txt"):
             # Skip if large.txt doesn't exist
@@ -351,6 +381,7 @@ class TestLargeFile(TimingTestBase):
             return
         
         self.editor = TextEditor()
+        qtbot.addWidget(self.editor)
         self.editor.show()
         QApplication.processEvents()
         
@@ -374,7 +405,7 @@ class TestLargeFile(TimingTestBase):
         self.record_timing("Max Opening File", "large.txt")
         assert True
     
-    def test_scroll(self):
+    def test_scroll(self, qtbot):
         """Measure frame time for scrolling in large.txt."""
         if not os.path.exists("large.txt"):
             assert True
@@ -387,7 +418,9 @@ class TestLargeFile(TimingTestBase):
         
         # Simulate scrolling
         for _ in range(30):
-            self.editor.editor.moveCursor(self.editor.editor.textCursor().Down)
+            cursor = self.editor.editor.textCursor()
+            cursor.movePosition(QTextCursor.Down)
+            self.editor.editor.setTextCursor(cursor)
             QApplication.processEvents()
             time.sleep(0.01)
         
@@ -395,7 +428,7 @@ class TestLargeFile(TimingTestBase):
         self.record_timing("Max Scroll", "large.txt")
         assert True
     
-    def test_click_far_away(self):
+    def test_click_far_away(self, qtbot):
         """Measure frame time for clicking far away in scroll bar for large.txt."""
         if not os.path.exists("large.txt"):
             assert True
@@ -407,7 +440,9 @@ class TestLargeFile(TimingTestBase):
         self.toggle_frame_timer()
         
         # Click near bottom of document
-        self.editor.editor.moveCursor(self.editor.editor.textCursor().End)
+        cursor = self.editor.editor.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self.editor.editor.setTextCursor(cursor)
         QApplication.processEvents()
         time.sleep(0.05)
         
@@ -415,7 +450,7 @@ class TestLargeFile(TimingTestBase):
         self.record_timing("Max Click Far Away", "large.txt")
         assert True
     
-    def test_find_replace(self):
+    def test_find_replace(self, qtbot):
         """Measure frame time for find & replace in large.txt."""
         if not os.path.exists("large.txt"):
             assert True
@@ -423,17 +458,12 @@ class TestLargeFile(TimingTestBase):
         
         self.open_editor_with_file("large.txt")
         
-        # Open find/replace dialog
-        self.editor.open_find_replace()
+        # Create find/replace dialog
+        find_dialog = FindReplaceDialog(self.editor.editor, self.editor)
+        qtbot.addWidget(find_dialog)
+        find_dialog.show()
         QApplication.processEvents()
         time.sleep(0.1)
-        
-        # Find the dialog
-        find_dialog = None
-        for widget in QApplication.topLevelWidgets():
-            if 'FindReplace' in widget.__class__.__name__:
-                find_dialog = widget
-                break
         
         if find_dialog:
             # Start frame timer
@@ -448,13 +478,24 @@ class TestLargeFile(TimingTestBase):
             # Perform replace all
             find_dialog.replace_all()
             
+            # Use a timer to press Enter key to dismiss the message box
+            def press_enter():
+                QApplication.postEvent(QApplication.instance(), QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Return, Qt.NoModifier))
+            
+            timer = QTimer()
+            timer.setSingleShot(True)
+            timer.timeout.connect(press_enter)
+            timer.start(500)  # Press Enter after 500ms
+            
             # Wait for completion (extended timeout for large file)
             timeout = time.time() + 120
             while time.time() < timeout:
                 QApplication.processEvents()
-                time.sleep(0.001)
+                time.sleep(0.01)
                 if not hasattr(find_dialog, '_replace_state'):
                     break
+            
+            timer.stop()
             
             # Record results
             self.record_timing("Max Find & Replace", "large.txt")
