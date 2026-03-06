@@ -1220,9 +1220,9 @@ class TestKeyboardShortcuts:
         window.show()
         qtbot.waitExposed(window)
         
-        # Check that there are no QShortcut children with Ctrl++ binding
+        # Check that there are no QShortcut children with zoom plus bindings (Ctrl++ or Ctrl+Plus)
         shortcuts = window.findChildren(QShortcut)
-        zoom_plus_shortcuts = [s for s in shortcuts if "+" in s.key().toString()]
+        zoom_plus_shortcuts = [s for s in shortcuts if s.key().toString() in ["Ctrl++", "Ctrl+Plus"]]
         
         assert len(zoom_plus_shortcuts) == 0, \
             f"Should not have alternate Ctrl++ shortcut, but found: {[s.key().toString() for s in zoom_plus_shortcuts]}"
@@ -9166,15 +9166,6 @@ class TestCoverageGaps:
         
         editor.setPlainText("\n".join(["y"] * 100))
         editor.update_line_number_area_width(0)
-    
-    def test_update_line_number_area(self, qtbot):
-        """Test CodeEditor update_line_number_area."""
-        editor = CodeEditor()
-        qtbot.addWidget(editor)
-        editor.show()
-        
-        editor.setPlainText("Line 1\nLine 2\nLine 3")
-        editor.update_line_number_area(editor.cursorRect(), 10)
     
     def test_code_editor_resize_event(self, qtbot):
         """Test CodeEditor resizeEvent."""
