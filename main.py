@@ -1326,97 +1326,104 @@ class FindReplaceDialog(QDialog):
             self.find_next()
     
     def replace_all(self):
-        find_text = self.find_input.text()
-        replace_text = self.replace_input.text()
-        if find_text:
-            import re
-            content = self.editor.toPlainText()
-            
-            # Count matches before replacement
-            pattern = re.escape(find_text)
-            matches = len(re.findall(pattern, content, flags=re.IGNORECASE))
-            
-            # For large content, defer the actual replacement to keep frames responsive
-            if len(content) > 10 * 1024 * 1024:  # 10MB threshold
-                # Store state for chunked processing
-                self._replace_state = {
-                    'pattern': pattern,
-                    'replace_text': replace_text,
-                    'lines': content.split('\n'),
-                    'line_index': 0,
-                    'total_matches': matches,
-                    'replaced_count': 0
-                }
-                # Start chunked replacement
-                self._replace_timer = QTimer(self.editor)
-                self._replace_timer.timeout.connect(self._replace_next_chunk)
-                self._replace_timer.start(16)  # ~60fps
-            else:
-                # For smaller files, do replacement all at once
-                new_content = re.sub(pattern, replace_text, content, flags=re.IGNORECASE)
-                
-                if new_content != content:
-                    # Use edit block for proper undo support
-                    cursor = self.editor.textCursor()
-                    cursor.beginEditBlock()
-                    cursor.select(QTextCursor.Document)
-                    cursor.insertText(new_content)
-                    cursor.endEditBlock()
-                    self.editor.document().setModified(True)
-                
-                # Show result (defer to avoid blocking in tests)
-                QTimer.singleShot(0, lambda: self._show_replace_result(matches))
+         find_text = self.find_input.text()
+         replace_text = self.replace_input.text()
+         if find_text:
+             import re
+             content = self.editor.toPlainText()
+             
+             # Compile regex pattern once for efficiency
+             pattern_obj = re.compile(re.escape(find_text), re.IGNORECASE)
+             
+             # Count matches before replacement
+             matches = len(pattern_obj.findall(content))
+             
+             # For large content, defer the actual replacement to keep frames responsive
+             if len(content) > 10 * 1024 * 1024:  # 10MB threshold
+                 # Store state for chunked processing
+                 self._replace_state = {
+                     'pattern': pattern_obj,
+                     'replace_text': replace_text,
+                     'lines': content.split('\n'),
+                     'line_index': 0,
+                     'total_matches': matches,
+                     'replaced_count': 0
+                 }
+                 # Initialize lines per frame to a small value to avoid frame drops
+                 self._replace_lines_per_frame = 100
+                 # Start chunked replacement
+                 self._replace_timer = QTimer(self.editor)
+                 self._replace_timer.timeout.connect(self._replace_next_chunk)
+                 self._replace_timer.start(16)  # ~60fps
+             else:
+                 # For smaller files, do replacement all at once
+                 new_content = pattern_obj.sub(replace_text, content)
+                 
+                 if new_content != content:
+                     # Use edit block for proper undo support
+                     cursor = self.editor.textCursor()
+                     cursor.beginEditBlock()
+                     cursor.select(QTextCursor.Document)
+                     cursor.insertText(new_content)
+                     cursor.endEditBlock()
+                     self.editor.document().setModified(True)
+                 
+                 # Show result (defer to avoid blocking in tests)
+                 QTimer.singleShot(0, lambda: self._show_replace_result(matches))
     
     def _replace_next_chunk(self):
-        """Process the next chunk of lines for find and replace."""
-        if not hasattr(self, '_replace_state'):
-            return
-        
-        state = self._replace_state
-        import re
-        
-        # Dynamically adjust lines per frame to fit in ~12ms (leaving 4ms buffer for other tasks)
-        lines_per_frame = getattr(self, '_replace_lines_per_frame', 5000)
-        start_idx = state['line_index']
-        start_time = time.time()
-        end_idx = min(start_idx + lines_per_frame, len(state['lines']))
-        
-        for i in range(start_idx, end_idx):
-            line = state['lines'][i]
-            new_line = re.sub(state['pattern'], state['replace_text'], line, flags=re.IGNORECASE)
-            if new_line != line:
-                state['replaced_count'] += len(re.findall(state['pattern'], line, flags=re.IGNORECASE))
-            state['lines'][i] = new_line
-        
-        # Measure frame time and adjust for next frame
-        frame_time = (time.time() - start_time) * 1000
-        lines_processed = end_idx - start_idx
-        if frame_time > 0 and lines_processed > 0:
-            target_ms = 12.0
-            new_lines = max(100, int(lines_processed * (target_ms / frame_time)))
-            self._replace_lines_per_frame = new_lines
-        
-        state['line_index'] = end_idx
-        
-        # Check if we're done
-        if end_idx >= len(state['lines']):
-            # Join back the lines and update editor
-            new_content = '\n'.join(state['lines'])
-            cursor = self.editor.textCursor()
-            cursor.beginEditBlock()
-            cursor.select(QTextCursor.Document)
-            cursor.insertText(new_content)
-            cursor.endEditBlock()
-            self.editor.document().setModified(True)
-            
-            # Clean up
-            self._replace_timer.stop()
-            del self._replace_timer
-            matches = state['total_matches']
-            del self._replace_state
-            
-            # Show result
-            QTimer.singleShot(0, lambda m=matches: self._show_replace_result(m))
+         """Process the next chunk of lines for find and replace."""
+         if not hasattr(self, '_replace_state'):
+             return
+         
+         state = self._replace_state
+         
+         # Dynamically adjust lines per frame to fit in ~12ms (leaving 4ms buffer for other tasks)
+         lines_per_frame = getattr(self, '_replace_lines_per_frame', 100)
+         start_idx = state['line_index']
+         start_time = time.time()
+         end_idx = min(start_idx + lines_per_frame, len(state['lines']))
+         
+         # Use pre-compiled pattern object for efficiency
+         pattern = state['pattern']
+         
+         for i in range(start_idx, end_idx):
+             line = state['lines'][i]
+             new_line = pattern.sub(state['replace_text'], line)
+             if new_line != line:
+                 # Count actual replacements made on this line
+                 state['replaced_count'] += len(pattern.findall(line))
+             state['lines'][i] = new_line
+         
+         # Measure frame time and adjust for next frame
+         frame_time = (time.time() - start_time) * 1000
+         lines_processed = end_idx - start_idx
+         if frame_time > 0 and lines_processed > 0:
+             target_ms = 12.0
+             new_lines = max(100, int(lines_processed * (target_ms / frame_time)))
+             self._replace_lines_per_frame = new_lines
+         
+         state['line_index'] = end_idx
+         
+         # Check if we're done
+         if end_idx >= len(state['lines']):
+             # Join back the lines and update editor
+             new_content = '\n'.join(state['lines'])
+             cursor = self.editor.textCursor()
+             cursor.beginEditBlock()
+             cursor.select(QTextCursor.Document)
+             cursor.insertText(new_content)
+             cursor.endEditBlock()
+             self.editor.document().setModified(True)
+             
+             # Clean up
+             self._replace_timer.stop()
+             del self._replace_timer
+             matches = state['total_matches']
+             del self._replace_state
+             
+             # Show result
+             QTimer.singleShot(0, lambda m=matches: self._show_replace_result(m))
     
     def _show_replace_result(self, matches):
         """Show replace result in a non-blocking way."""

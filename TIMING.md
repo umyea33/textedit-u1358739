@@ -21,7 +21,7 @@ Avg Max Opening File    : 34 ms
 Max Scroll        : 19 ms
 Max Click Far Away: 20 ms
 Avg Click Far Away: 8 ms
-Max Find & Replace: 3444 ms then 14828 ms
+Max Find & Replace: 3429 ms then 14650 ms
 Total Memory Used : 1.457 GB
 
 
