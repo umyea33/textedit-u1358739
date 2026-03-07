@@ -56,7 +56,7 @@ class FrameTimerWidget(QLabel):
         # Timer to update frame timings
         self.frame_timer = QTimer(self)
         self.frame_timer.timeout.connect(self.update_frame_timing)
-        self.frame_timer.setInterval(16)  # ~60 FPS
+        self.frame_timer.setInterval(8)  # ~120 FPS
         
         # Track frame timing
         self.last_frame_tick = time.time()
